@@ -32,11 +32,11 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Accept Licenses and Check Platforms
+      - name: Accept Licenses and Install SDK 36
         run: |
           if command -v sdkmanager &> /dev/null; then
             yes | sdkmanager --licenses || true
-            sdkmanager "platforms;android-35" || true
+            sdkmanager "platforms;android-36" "build-tools;36.0.0" "platforms;android-35" || true
           fi
 
       - name: Prepare gradlew script
@@ -47,7 +47,15 @@ jobs:
       - name: Build APK with Gradle
         working-directory: ./final-output/android
         run: |
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace > build.log 2>&1 || {
+            BUILD_STATUS=$?
+            echo "### ❌ Build Failed with Exit Code $BUILD_STATUS" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            tail -n 120 build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat build.log
+            exit $BUILD_STATUS
+          }
 
       - name: Find and Copy APK to Root
         run: |

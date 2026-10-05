@@ -47,17 +47,24 @@ jobs:
       - name: Build APK with Gradle
         working-directory: ./final-output/android
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../../gradle.log
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
-      - name: Locate Built APK Files
+      - name: Find and Copy APK to Root
         run: |
-          echo "=== Found APK files ==="
-          find . -name "*.apk" -ls
+          APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            echo "::error::No APK file found in build outputs. Listing all outputs:"
+            find . -path "*/outputs/*"
+            exit 1
+          fi
+          echo "Found APK at: $APK_FILE"
+          cp "$APK_FILE" ./honest-app-debug.apk
+          ls -lh ./honest-app-debug.apk
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: honest-app-debug-apk
-          path: '**/*.apk'
+          path: ./honest-app-debug.apk
           if-no-files-found: error
           retention-days: 14

@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build Debug APK
@@ -47,22 +50,24 @@ jobs:
       - name: Build APK with Gradle
         working-directory: ./final-output/android
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace > build.log 2>&1 || {
-            BUILD_STATUS=$?
-            echo "### ❌ Build Failed with Exit Code $BUILD_STATUS" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            tail -n 120 build.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat build.log
-            exit $BUILD_STATUS
-          }
+          ./gradlew assembleDebug --no-daemon --stacktrace > build.log 2>&1
+
+      - name: Save Build Error Log on Failure
+        if: failure()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout -B ci-error-log
+          cp final-output/android/build.log ./build-error.log
+          git add build-error.log
+          git commit -m "chore: save build-error.log"
+          git push -f origin ci-error-log
 
       - name: Find and Copy APK to Root
         run: |
           APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
           if [ -z "$APK_FILE" ]; then
-            echo "::error::No APK file found in build outputs. Listing all outputs:"
-            find . -path "*/outputs/*"
+            echo "::error::No APK file found in build outputs."
             exit 1
           fi
           echo "Found APK at: $APK_FILE"

@@ -1,0 +1,52 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Detect Android Project Path
+        id: find_path
+        run: |
+          if [ -d "final-output/android" ]; then
+            echo "dir=final-output/android" >> $GITHUB_OUTPUT
+          elif [ -d "android" ]; then
+            echo "dir=android" >> $GITHUB_OUTPUT
+          else
+            echo "Android directory not found"
+            exit 1
+          fi
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x ./${{ steps.find_path.outputs.dir }}/gradlew
+
+      - name: Build APK with Gradle
+        working-directory: ./${{ steps.find_path.outputs.dir }}
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: honest-app-debug-apk
+          path: ${{ steps.find_path.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14

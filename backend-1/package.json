@@ -1,0 +1,17 @@
+{
+  "name": "honest-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HONEST — Be honest with yourself. Backend for the student accountability app (Node.js + Express + SQLite).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/dates.test.js test/tasks.test.js test/daily.test.js test/reports.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

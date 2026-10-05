@@ -1,0 +1,17 @@
+node_modules/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+npm-debug.log*
+.DS_Store
+
+# Android & iOS build output
+.gradle/
+build/
+*/build/
+*/*/build/
+.idea/
+*.iml
+ios/App/Pods/

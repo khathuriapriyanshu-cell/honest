@@ -1,0 +1,9 @@
+{
+  "appId": "com.honest.app",
+  "appName": "HONEST",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

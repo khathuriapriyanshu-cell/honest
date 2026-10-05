@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#121316">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>HONEST - Be Honest With Yourself</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Global Accountability Notification Banner -->
+  <aside id="global-notification" class="notification-bar hidden" role="status" aria-live="polite">
+    <div class="notification-content">
+      <svg class="icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <span id="notification-message">Be honest with yourself. You still have unfinished tasks today.</span>
+      <button id="notification-view-unfinished" class="btn-subtle-inline">View unfinished tasks</button>
+    </div>
+    <button id="notification-close" class="btn-icon" aria-label="Close notification">
+      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </aside>
+
+  <!-- App Wrapper -->
+  <div class="app-layout">
+    <!-- Main Top Navigation -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-logo-mark" aria-hidden="true">h</div>
+        <div class="brand-text-block">
+          <div class="brand-title">HONEST</div>
+          <div class="brand-tagline">BE HONEST WITH YOURSELF.</div>
+        </div>
+      </div>
+
+      <!-- Core V1 Navigation -->
+      <nav class="main-nav" aria-label="Primary Navigation">
+        <button class="nav-tab active" data-view="view-today">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Today</span>
+        </button>
+        <button class="nav-tab" data-view="view-calendar">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>Calendar</span>
+        </button>
+        <button class="nav-tab" data-view="view-archive">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="21 8 21 21 3 21 3 8"></polyline>
+            <rect x="1" y="3" width="22" height="5"></rect>
+            <line x1="10" y1="12" x2="14" y2="12"></line>
+          </svg>
+          <span>Past Reflections</span>
+        </button>
+        <button class="nav-tab" data-view="view-settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <div class="header-controls">
+        <button id="theme-toggle" class="btn-ghost" title="Toggle Light/Dark Theme" aria-label="Toggle theme">
+          <svg class="icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <div id="backend-status-indicator" class="status-indicator" title="Backend connection status">
+          <span class="status-dot"></span>
+          <span class="status-label">Online</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+      <!-- Error Message Banner -->
+      <div id="app-error-banner" class="alert-banner error hidden" role="alert">
+        <div class="alert-text" id="app-error-text"></div>
+        <div class="alert-actions">
+          <button id="app-error-retry" class="btn-subtle">Retry</button>
+          <button id="app-error-dismiss" class="btn-icon" aria-label="Dismiss error">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- VIEW 1: TODAY (HOME / DASHBOARD) -->
+      <section id="view-today" class="view-panel active">
+        <!-- Date Header & Completion Count -->
+        <div class="today-header-block">
+          <div class="date-meta">
+            <h1 class="current-date-title" id="today-date-display">Today</h1>
+            <div class="subtle-meta">
+              <span class="completion-count-pill" id="today-completion-count">0 / 0 completed</span>
+              <span class="meta-separator">/</span>
+              <span class="honest-days-counter">
+                <span class="counter-number" id="honest-days-number">0</span>
+                <span class="counter-label">Honest Days</span>
+              </span>
+            </div>
+          </div>
+          <div class="today-action-group">
+            <button id="btn-open-add-task" class="btn-primary">
+              <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>+ Add Task</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Night Check Prompt Banner (when unfinished promises exist at check time) -->
+        <div id="night-check-prompt-banner" class="banner-accountability hidden">
+          <div class="banner-content">
+            <div class="banner-heading">Be honest with yourself.</div>
+            <div class="banner-subtext" id="night-check-prompt-text">You still have unfinished tasks today.</div>
+          </div>
+          <button id="btn-night-check-open" class="btn-accent-action">View unfinished tasks</button>
+        </div>
+
+        <!-- MIDNIGHT / DAY LOCK SCREEN (Blocks dashboard when yesterday has incomplete tasks) -->
+        <div id="day-lock-container" class="day-lock-screen hidden">
+          <div class="lock-card">
+            <div class="lock-header">
+              <div class="lock-badge">Day Lock</div>
+              <h2 class="lock-title">Yesterday isn't finished.</h2>
+            </div>
+            <div class="lock-body">
+              <p class="lock-instruction">You didn't complete:</p>
+              <ul id="lock-unfinished-list" class="lock-task-list"></ul>
+
+              <form id="form-day-lock" class="lock-form">
+                <div class="form-group">
+                  <label for="lock-reason-input" class="form-label">Explain why</label>
+                  <textarea id="lock-reason-input" class="form-textarea" rows="3" placeholder="Tell this to yourself." required></textarea>
+                </div>
+                <button type="submit" class="btn-primary full-width">Save Reflection &amp; Continue</button>
+              </form>
+
+              <!-- State 2: After submit -->
+              <div id="lock-success-view" class="lock-success hidden">
+                <div class="success-title">Reflection recorded.</div>
+                <p class="success-subtitle">Now start today honestly.</p>
+                <button id="btn-lock-start-new-day" class="btn-primary full-width" style="margin-top: 1.25rem;">Start New Day</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Task List Container -->
+        <div id="tasks-container-wrap" class="tasks-section">
+          <div class="section-meta-row">
+            <div class="section-title">Today's Tasks</div>
+            <div class="section-hint">Click task to view details / edit</div>
+          </div>
+
+          <!-- Loading State -->
+          <div id="tasks-loading" class="state-container hidden">
+            <div class="spinner"></div>
+            <div class="state-text">Loading today's tasks...</div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="tasks-empty" class="state-container hidden">
+            <div class="state-title">No tasks for today.</div>
+            <div class="state-text">Commit to what matters today. Make a promise to yourself.</div>
+            <button id="btn-empty-add-task" class="btn-secondary" style="margin-top: 1rem;">+ Add Task</button>
+          </div>
+
+          <!-- Tasks List with ON / OFF toggles -->
+          <ul id="task-list" class="task-list" role="list"></ul>
+        </div>
+      </section>
+
+      <!-- VIEW 2: CALENDAR -->
+      <section id="view-calendar" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Calendar</h1>
+            <div class="view-subtitle">Review every day as it actually happened.</div>
+          </div>
+          <div class="calendar-controls">
+            <button id="calendar-prev-month" class="btn-icon" aria-label="Previous month">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <span id="calendar-month-label" class="calendar-month-name">October 2026</span>
+            <button id="calendar-next-month" class="btn-icon" aria-label="Next month">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="calendar-legend">
+          <div class="legend-item">
+            <span class="legend-dot dot-completed"></span>
+            <span>Everything completed</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot dot-explained"></span>
+            <span>Some tasks missed but explained</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot dot-unresolved"></span>
+            <span>Unfinished / unresolved</span>
+          </div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="calendar-container">
+          <div class="calendar-weekdays" id="calendar-weekdays-row">
+            <div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+        </div>
+
+        <!-- Day Detail Drawer -->
+        <div id="calendar-day-detail" class="detail-card hidden">
+          <div class="detail-header">
+            <div>
+              <div class="detail-date" id="day-detail-date">5 October</div>
+              <div class="detail-ratio" id="day-detail-ratio">4 / 5 completed</div>
+            </div>
+            <button id="calendar-day-detail-close" class="btn-icon" aria-label="Close details">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="detail-body">
+            <div class="detail-subhead">Tasks</div>
+            <ul id="day-detail-tasks" class="history-task-list"></ul>
+
+            <div id="day-detail-reflection-box" class="reflection-display-box hidden">
+              <div class="detail-subhead">Reflection</div>
+              <blockquote id="day-detail-reflection-text" class="reflection-quote"></blockquote>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: PAST REFLECTIONS (HISTORY) -->
+      <section id="view-archive" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Past Reflections</h1>
+            <div class="view-subtitle">Your personal record of reasons, transparently documented.</div>
+          </div>
+          <div class="archive-search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="archive-search-input" placeholder="Search past reasons..." class="form-input search-input">
+          </div>
+        </div>
+
+        <div id="archive-loading" class="state-container hidden">
+          <div class="spinner"></div>
+          <div class="state-text">Loading reflections...</div>
+        </div>
+
+        <div id="archive-empty" class="state-container hidden">
+          <div class="state-title">No reflections recorded yet.</div>
+          <div class="state-text">When you miss a task and record your reason, it is preserved here for honest self-inspection.</div>
+        </div>
+
+        <div id="archive-list" class="archive-timeline"></div>
+      </section>
+
+      <!-- VIEW 4: SETTINGS -->
+      <section id="view-settings" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Settings</h1>
+            <div class="view-subtitle">Accountability parameters and application preferences.</div>
+          </div>
+        </div>
+
+        <form id="settings-form" class="settings-container">
+          <div class="settings-group">
+            <h3 class="settings-group-title">Timing &amp; Accountability</h3>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <label for="setting-accountability-time" class="setting-title">Daily Check Time</label>
+                <div class="setting-subtext">Evening check time. Default is 10:30 PM.</div>
+              </div>
+              <input type="time" id="setting-accountability-time" class="form-input input-time" value="22:30">
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <label for="setting-daily-reset" class="setting-title">Day Reset Time</label>
+                <div class="setting-subtext">When the day closes. Default is 12:00 AM.</div>
+              </div>
+              <input type="time" id="setting-daily-reset" class="form-input input-time" value="00:00">
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">Preferences &amp; Account</h3>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <label for="setting-username" class="setting-title">Account / Username</label>
+                <div class="setting-subtext">Your name or handle in the app.</div>
+              </div>
+              <input type="text" id="setting-username" class="form-input" style="max-width: 220px;" placeholder="Student">
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <label for="setting-notifications" class="setting-title">Notifications</label>
+                <div class="setting-subtext">Display proactive accountability check prompts.</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="setting-notifications" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <label for="setting-theme" class="setting-title">Theme</label>
+                <div class="setting-subtext">Dark or Light interface appearance.</div>
+              </div>
+              <select id="setting-theme" class="form-select" style="max-width: 140px;">
+                <option value="dark" selected>Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="settings-actions">
+            <button type="submit" id="btn-save-settings" class="btn-primary">Save Settings</button>
+            <span id="settings-status-msg" class="status-msg"></span>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: ADD TASK -->
+  <div id="modal-add-task" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-add-task-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-subtitle">Make a promise</div>
+          <h2 id="modal-add-task-title" class="modal-title">+ Add Task</h2>
+        </div>
+        <button id="modal-add-task-close" class="btn-icon" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <form id="form-add-task" class="modal-body">
+        <div class="form-group">
+          <label for="task-input-title" class="form-label">Task Name <span class="required">*</span></label>
+          <input type="text" id="task-input-title" class="form-input" placeholder="e.g. DSA Practice, Study Physics, Workout" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="task-input-description" class="form-label">Description (Optional)</label>
+          <input type="text" id="task-input-description" class="form-input" placeholder="e.g. At least 45 minutes, solve 3 problems without solutions">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Repeat</label>
+          <div class="radio-pill-group">
+            <label class="radio-pill">
+              <input type="radio" name="task-repeat" value="daily" checked>
+              <span>Every day</span>
+            </label>
+            <label class="radio-pill">
+              <input type="radio" name="task-repeat" value="selected">
+              <span>Specific days</span>
+            </label>
+            <label class="radio-pill">
+              <input type="radio" name="task-repeat" value="once">
+              <span>One time</span>
+            </label>
+          </div>
+
+          <!-- Specific Day Selection -->
+          <div id="task-selected-days-wrap" class="days-select-wrap hidden">
+            <label class="day-checkbox"><input type="checkbox" name="selected-day" value="1"><span>M</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="selected-day" value="2"><span>T</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="selected-day" value="3"><span>W</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="selected-day" value="4"><span>T</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="selected-day" value="5"><span>F</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="selected-day" value="6"><span>S</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="selected-day" value="7"><span>S</span></label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="task-input-reminder" class="form-label">Reminder time (Optional)</label>
+          <input type="time" id="task-input-reminder" class="form-input input-time">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="modal-add-task-cancel" class="btn-subtle">Cancel</button>
+          <button type="submit" id="btn-submit-add-task" class="btn-primary">Save Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TASK DETAIL (Opened when tapping a task) -->
+  <div id="modal-task-detail" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-subtitle">Task Details</div>
+          <h2 id="task-detail-title" class="modal-title">Task Name</h2>
+        </div>
+        <button id="modal-task-detail-close" class="btn-icon" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail-property-row">
+          <span class="detail-prop-label">Description:</span>
+          <span id="detail-prop-description" class="detail-prop-val">-</span>
+        </div>
+        <div class="detail-property-row">
+          <span class="detail-prop-label">Repeat:</span>
+          <span id="detail-prop-repeat" class="detail-prop-val">-</span>
+        </div>
+        <div class="detail-property-row">
+          <span class="detail-prop-label">Reminder:</span>
+          <span id="detail-prop-reminder" class="detail-prop-val">None</span>
+        </div>
+        <div class="detail-property-row">
+          <span class="detail-prop-label">Created Date:</span>
+          <span id="detail-prop-created" class="detail-prop-val">-</span>
+        </div>
+      </div>
+
+      <div class="modal-footer split">
+        <button id="btn-detail-delete-task" class="btn-danger-outline">Delete</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-detail-edit-task" class="btn-secondary">Edit</button>
+          <button id="btn-detail-close" class="btn-primary">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT TASK -->
+  <div id="modal-edit-task" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-edit-task-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-subtitle">Modify Promise</div>
+          <h2 id="modal-edit-task-title" class="modal-title">Edit Task</h2>
+        </div>
+        <button id="modal-edit-task-close" class="btn-icon" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <form id="form-edit-task" class="modal-body">
+        <input type="hidden" id="edit-task-id">
+        <div class="form-group">
+          <label for="edit-task-title" class="form-label">Task Name <span class="required">*</span></label>
+          <input type="text" id="edit-task-title" class="form-input" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-task-description" class="form-label">Description (Optional)</label>
+          <input type="text" id="edit-task-description" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Repeat</label>
+          <div class="radio-pill-group">
+            <label class="radio-pill">
+              <input type="radio" name="edit-task-repeat" value="daily">
+              <span>Every day</span>
+            </label>
+            <label class="radio-pill">
+              <input type="radio" name="edit-task-repeat" value="selected">
+              <span>Specific days</span>
+            </label>
+            <label class="radio-pill">
+              <input type="radio" name="edit-task-repeat" value="once">
+              <span>One time</span>
+            </label>
+          </div>
+
+          <div id="edit-selected-days-wrap" class="days-select-wrap hidden">
+            <label class="day-checkbox"><input type="checkbox" name="edit-selected-day" value="1"><span>M</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="edit-selected-day" value="2"><span>T</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="edit-selected-day" value="3"><span>W</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="edit-selected-day" value="4"><span>T</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="edit-selected-day" value="5"><span>F</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="edit-selected-day" value="6"><span>S</span></label>
+            <label class="day-checkbox"><input type="checkbox" name="edit-selected-day" value="7"><span>S</span></label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-task-reminder" class="form-label">Reminder time (Optional)</label>
+          <input type="time" id="edit-task-reminder" class="form-input input-time">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="modal-edit-task-cancel" class="btn-subtle">Cancel</button>
+          <button type="submit" class="btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NIGHT CHECK / UNFINISHED TASKS SCREEN -->
+  <div id="modal-night-check" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-night-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-subtitle">Night Accountability</div>
+          <h2 id="modal-night-title" class="modal-title">Unfinished Tasks</h2>
+        </div>
+        <button id="modal-night-close" class="btn-icon" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p class="night-check-count-text">
+          Be honest with yourself. You still have unfinished tasks today:
+        </p>
+
+        <ul id="night-check-tasks-list" class="night-check-list"></ul>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-night-close" class="btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

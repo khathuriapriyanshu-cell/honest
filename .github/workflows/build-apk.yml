@@ -16,14 +16,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Java JDK 17
+      - name: Set up Java JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+          cache: 'gradle'
 
       - name: Detect Android Project Path
         id: find_path
@@ -37,8 +35,13 @@ jobs:
             exit 1
           fi
 
-      - name: Grant Execute Permission to Gradlew
-        run: chmod +x ./${{ steps.find_path.outputs.dir }}/gradlew
+      - name: Accept Android SDK Licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Fix line endings and grant execute permission
+        run: |
+          sed -i 's/\r$//' ./${{ steps.find_path.outputs.dir }}/gradlew
+          chmod +x ./${{ steps.find_path.outputs.dir }}/gradlew
 
       - name: Build APK with Gradle
         working-directory: ./${{ steps.find_path.outputs.dir }}

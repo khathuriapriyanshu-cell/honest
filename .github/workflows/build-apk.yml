@@ -16,16 +16,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
 
-      - name: Install Dependencies & Sync Capacitor
+      - name: Install npm dependencies
         working-directory: final-output
-        run: |
-          npm install
-          npx cap sync android
+        run: npm install --ignore-engines
 
       - name: Set up Java JDK 21
         uses: actions/setup-java@v4
@@ -34,10 +32,12 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Setup Android Platforms & Accept Licenses
+      - name: Accept Licenses and Check Platforms
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;35.0.0" || true
+          if command -v sdkmanager &> /dev/null; then
+            yes | sdkmanager --licenses || true
+            sdkmanager "platforms;android-35" || true
+          fi
 
       - name: Prepare gradlew script
         run: |

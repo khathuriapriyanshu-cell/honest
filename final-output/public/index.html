@@ -373,6 +373,18 @@
             </div>
           </div>
 
+          <div class="settings-group">
+            <h3 class="settings-group-title">Cloud &amp; Backend Sync</h3>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <label for="setting-api-url" class="setting-title">Server API URL</label>
+                <div class="setting-subtext">Leave blank for 100% offline on-device mode, or enter your Vercel / server URL to sync.</div>
+              </div>
+              <input type="text" id="setting-api-url" class="form-input" style="max-width: 260px;" placeholder="Offline (On-Device)">
+            </div>
+          </div>
+
           <div class="settings-actions">
             <button type="submit" id="btn-save-settings" class="btn-primary">Save Settings</button>
             <span id="settings-status-msg" class="status-msg"></span>

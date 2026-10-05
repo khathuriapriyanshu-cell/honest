@@ -116,7 +116,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingUsername = document.getElementById('setting-username');
   const settingNotifications = document.getElementById('setting-notifications');
   const settingTheme = document.getElementById('setting-theme');
+  const settingApiUrl = document.getElementById('setting-api-url');
   const settingsStatusMsg = document.getElementById('settings-status-msg');
+  const backendStatusIndicator = document.getElementById('backend-status-indicator');
+  const backendStatusLabel = backendStatusIndicator ? backendStatusIndicator.querySelector('.status-label') : null;
+
+  // Connection Indicator Listener
+  ApiService.onConnectionChange((isConnected, url) => {
+    if (!backendStatusIndicator) return;
+    if (isConnected) {
+      backendStatusIndicator.classList.remove('is-local');
+      backendStatusIndicator.classList.add('is-online');
+      if (backendStatusLabel) backendStatusLabel.textContent = 'Online';
+      backendStatusIndicator.title = `Connected to server: ${url}`;
+    } else {
+      backendStatusIndicator.classList.remove('is-online');
+      backendStatusIndicator.classList.add('is-local');
+      if (backendStatusLabel) backendStatusLabel.textContent = 'Local';
+      backendStatusIndicator.title = 'Running on-device in standalone local mode';
+    }
+  });
 
   // ==========================================
   // Initialization
@@ -757,6 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (s.dailyReset) settingDailyReset.value = s.dailyReset;
       if (s.notifications !== undefined) settingNotifications.checked = s.notifications;
       if (s.theme) settingTheme.value = s.theme;
+      if (settingApiUrl) settingApiUrl.value = s.apiUrl || ApiService.getBaseUrl() || '';
 
       const savedUser = localStorage.getItem('honest_username') || 'Student';
       settingUsername.value = savedUser;
@@ -771,17 +791,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     localStorage.setItem('honest_username', settingUsername.value.trim() || 'Student');
 
+    const customApi = settingApiUrl ? settingApiUrl.value.trim() : '';
+    ApiService.setBaseUrl(customApi);
+
     const payload = {
       accountabilityTime: settingAccountabilityTime.value,
       dailyReset: settingDailyReset.value,
       notifications: settingNotifications.checked,
-      theme: settingTheme.value
+      theme: settingTheme.value,
+      apiUrl: customApi
     };
 
     try {
       await ApiService.updateSettings(payload);
       settingsStatusMsg.textContent = 'Settings saved.';
       setTimeout(() => { settingsStatusMsg.textContent = ''; }, 3000);
+      loadTodayData();
     } catch (err) {
       showError('Failed to save settings: ' + err.message);
       settingsStatusMsg.textContent = '';

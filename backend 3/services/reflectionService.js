@@ -84,15 +84,76 @@ function resolveReflectionDate({ db, clock }, requestedDate) {
 }
 
 /**
+ * Validates a list of promise *names* supplied by a client.
+ * Names are matched case-insensitively, ignoring surrounding whitespace, so a
+ * mobile client can send the labels it displayed without knowing the ids.
+ */
+function asTaskNameList(value, field = 'missedTasks') {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value)) {
+    validate.fail('INVALID_FIELD', `"${field}" must be an array of promise names.`);
+  }
+  const names = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') {
+      validate.fail('INVALID_FIELD', `"${field}" may only contain promise names (strings).`);
+    }
+    const clean = entry.trim();
+    if (clean.length === 0) {
+      validate.fail('INVALID_FIELD', `"${field}" may not contain an empty name.`);
+    }
+    names.push(clean);
+  }
+  return names;
+}
+
+function normalizeName(text) {
+  return String(text).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** A promise can only be explained while it is still unresolved. */
+function requireUnresolved(item, date) {
+  if (!item.unresolved) {
+    throw ApiError.conflict(
+      'TASK_ALREADY_RESOLVED',
+      `"${item.displayTask.name}" on ${date} is already completed or explained.`,
+      { taskId: item.task.id, date, state: item.state }
+    );
+  }
+}
+
+/**
+ * Finds the promise an entry in `missedTasks` refers to.
+ * Accepts either a promise name ("30 min Workout") or a numeric id ("3"), so
+ * both clients can send what they naturally hold.
+ */
+function findItemByNameOrId(items, entry) {
+  const byId = /^\d+$/.test(String(entry).trim()) ? Number(String(entry).trim()) : null;
+  if (byId !== null) {
+    const byIdMatch = items.find((item) => item.task.id === byId);
+    if (byIdMatch) return byIdMatch;
+  }
+  const wanted = normalizeName(entry);
+  const exact = items.find((item) => normalizeName(item.displayTask.name) === wanted);
+  if (exact) return exact;
+  // Fall back to the live name in case an occurrence froze an older wording.
+  return items.find((item) => normalizeName(item.task.name) === wanted) || null;
+}
+
+/**
  * Submits an honest reflection for one or more missed promises.
  *
  * @param {object} deps { db, clock }
- * @param {object} input { reason, date?, taskIds?, source? }
+ * @param {object} input { reason, date?, taskIds?, missedTasks?, source? }
  */
 function submitReflection({ db, clock }, input) {
   validate.requireObject(input, 'body');
   const reason = validate.asReflectionReason(input.reason ?? input.reflection, 'reason');
-  const explicitIds = validate.asIdList(input.taskIds ?? input.taskIds, 'taskIds');
+  const explicitIds = validate.asIdList(input.taskIds ?? input.task_ids, 'taskIds');
+  const explicitNames = asTaskNameList(
+    input.missedTasks ?? input.missed_tasks ?? input.tasks ?? null,
+    'missedTasks'
+  );
   const { date, today, carriedOver } = resolveReflectionDate({ db, clock }, input.date || null);
   const source = input.source
     ? validate.asEnum(input.source, 'source', ['night_check', 'midnight', 'carry_over', 'manual'], {
@@ -134,14 +195,22 @@ function submitReflection({ db, clock }, input) {
           { taskId: id, date }
         );
       }
-      if (!item.unresolved) {
-        throw ApiError.conflict(
-          'TASK_ALREADY_RESOLVED',
-          `"${item.displayTask.name}" on ${date} is already completed or explained.`,
-          { taskId: id, date, state: item.state }
+      requireUnresolved(item, date);
+      targets.push(item);
+    }
+  } else if (explicitNames && explicitNames.length > 0) {
+    targets = [];
+    for (const name of explicitNames) {
+      const item = findItemByNameOrId(day.items, name);
+      if (!item) {
+        throw ApiError.badRequest(
+          'TASK_NOT_ON_DATE',
+          `"${name}" is not part of ${date}, so it cannot be explained for that day.`,
+          { missedTask: name, date, available: day.items.map((i) => i.displayTask.name) }
         );
       }
-      targets.push(item);
+      requireUnresolved(item, date);
+      if (!targets.includes(item)) targets.push(item);
     }
   }
 
@@ -211,7 +280,7 @@ function submitReflection({ db, clock }, input) {
   };
 }
 
-/** Reflections for a date, or a range. */
+/** Reflections for a date, or a range. Newest day first. */
 function listReflections(db, { from = null, to = null, taskId = null, limit = 500 } = {}) {
   const clauses = [];
   const params = [];
@@ -234,7 +303,69 @@ function listReflections(db, { from = null, to = null, taskId = null, limit = 50
     `SELECT * FROM reflections ${where} ORDER BY date DESC, id DESC LIMIT ?`,
     params
   );
-  return rows.map(toApiShape);
+  return groupByDay(rows);
+}
+
+/**
+ * Groups reflection rows into one entry per day.
+ *
+ * One honest reason can cover several missed promises, so the day is the unit a
+ * history view cares about: `{ date, reason, missedTasks: [...] }`. When a day
+ * carries more than one reason they are joined, and every promise name is kept.
+ */
+function groupByDay(rows) {
+  const days = new Map();
+  for (const row of rows) {
+    const shape = toApiShape(row);
+    if (!days.has(shape.isoDate)) {
+      days.set(shape.isoDate, {
+        date: shape.isoDate,
+        dateLabel: shape.date,
+        reasons: [],
+        tasks: [],
+        reflectionIds: [],
+        sources: [],
+        createdAt: shape.createdAt,
+      });
+    }
+    const day = days.get(shape.isoDate);
+    if (shape.taskName && !day.tasks.some((entry) => entry.name === shape.taskName)) {
+      day.tasks.push({ name: shape.taskName, taskId: shape.taskId });
+    }
+    day.reflectionIds.push(shape.id);
+    if (!day.sources.includes(shape.source)) day.sources.push(shape.source);
+
+    // Several promises can be explained with the same words (one submission) or
+    // with different words (separate submissions). Store the distinct reasons so
+    // a repeated sentence is never duplicated in the output.
+    if (!day.reasons.includes(shape.reason)) day.reasons.push(shape.reason);
+  }
+
+  return (
+    [...days.values()]
+      .map((day) => {
+        // Order the missed promises the way the day displayed them (id order)
+        // so the same data always produces the same array.
+        const orderedTasks = day.tasks
+          .slice()
+          .sort((a, b) => Number(a.taskId || 0) - Number(b.taskId || 0));
+
+        return {
+          date: day.date,
+          isoDate: day.date,
+          dateLabel: day.dateLabel,
+          reason: day.reasons.join(' | '),
+          missedTasks: orderedTasks.map((entry) => entry.name),
+          missedTaskIds: orderedTasks.map((entry) => entry.taskId),
+          reflectionIds: day.reflectionIds,
+          reflectionCount: day.reflectionIds.length,
+          sources: day.sources,
+          createdAt: day.createdAt,
+        };
+      })
+      // Newest day first, as the history view expects.
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+  );
 }
 
 /** Raw rows (used by analytics that need `date` in ISO form). */

@@ -30,6 +30,14 @@ function createCalendarRoutes(deps) {
     return ok(res, data);
   });
 
+  router.get('/calendar/:date', (req, res, next) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(req.params.date)) {
+      const data = historyService.dayDetail(deps, req.params.date);
+      return ok(res, data);
+    }
+    return next();
+  });
+
   router.get('/history', (req, res) => {
     const runtime = getRuntimeSettings(deps.db);
     const today = deps.clock.today(runtime.resolvedTimezone);

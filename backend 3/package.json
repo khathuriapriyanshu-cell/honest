@@ -12,6 +12,7 @@
     "dev": "node --watch server.js",
     "test": "node tests/run.js",
     "verify": "node scripts/verify-api.js",
+    "verify:client": "node scripts/verify-client-contract.js",
     "verify:turso": "node scripts/verify-turso.js",
     "verify:vercel": "node scripts/verify-vercel-entry.js",
     "verify:all": "node tests/run.js && node scripts/verify-turso.js && node scripts/verify-vercel-entry.js",

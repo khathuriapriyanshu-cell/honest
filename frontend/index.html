@@ -162,22 +162,26 @@
               <h2 class="lock-title">Yesterday isn't finished.</h2>
             </div>
             <div class="lock-body">
-              <p class="lock-instruction">You didn't complete:</p>
+              <p class="lock-instruction">You didn't complete these tasks:</p>
               <ul id="lock-unfinished-list" class="lock-task-list"></ul>
 
               <form id="form-day-lock" class="lock-form">
                 <div class="form-group">
                   <label for="lock-reason-input" class="form-label" style="font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">TELL THIS TO YOURSELF</label>
                   <textarea id="lock-reason-input" class="form-textarea" rows="3" placeholder="Tell this to yourself." required></textarea>
+                  <p class="lock-subtle-reminder">
+                    You don't have to explain yourself to the app.<br>
+                    You only have to be honest with yourself.
+                  </p>
                 </div>
-                <button type="submit" class="btn-primary full-width">Save Reflection &amp; Continue</button>
+                <button type="submit" id="btn-save-reflection" class="btn-primary full-width">Save Reflection</button>
               </form>
 
               <!-- State 2: After submit -->
               <div id="lock-success-view" class="lock-success hidden">
                 <div class="success-title">Reflection recorded.</div>
-                <p class="success-subtitle">Now start today honestly.</p>
-                <button id="btn-lock-start-new-day" class="btn-primary full-width" style="margin-top: 1.25rem;">Start New Day</button>
+                <p class="success-subtitle">Yesterday is closed.<br>Start today honestly.</p>
+                <button id="btn-lock-start-new-day" class="btn-primary full-width" style="margin-top: 1.25rem;">Start Today</button>
               </div>
             </div>
           </div>
@@ -324,18 +328,30 @@
 
             <div class="setting-row">
               <div class="setting-info">
-                <label for="setting-accountability-time" class="setting-title">Daily Check Time</label>
-                <div class="setting-subtext">Evening check time (e.g. 22:30 or 10:30 PM). Tap to type.</div>
+                <label class="setting-title">Daily Checking Time</label>
+                <div class="setting-subtext">Evening reminder time (e.g. 10:30 PM).</div>
               </div>
-              <input type="text" inputmode="numeric" id="setting-accountability-time" class="form-input input-time" value="22:30" placeholder="22:30" maxlength="8">
+              <div class="time-picker-box" id="tp-accountability-time">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-hours" maxlength="2" placeholder="10" value="10" aria-label="Hours">
+                <span class="time-separator">:</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-mins" maxlength="2" placeholder="30" value="30" aria-label="Minutes">
+                <button type="button" class="time-ampm-pill tp-ampm" aria-label="Toggle AM/PM">PM</button>
+                <input type="hidden" id="setting-accountability-time" value="22:30">
+              </div>
             </div>
 
             <div class="setting-row">
               <div class="setting-info">
-                <label for="setting-daily-reset" class="setting-title">Day Reset Time</label>
-                <div class="setting-subtext">When the day closes (e.g. 00:00 or 12:00 AM). Tap to type.</div>
+                <label class="setting-title">Day Reset Time</label>
+                <div class="setting-subtext">When the day closes (e.g. 12:00 AM).</div>
               </div>
-              <input type="text" inputmode="numeric" id="setting-daily-reset" class="form-input input-time" value="00:00" placeholder="00:00" maxlength="8">
+              <div class="time-picker-box" id="tp-daily-reset">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-hours" maxlength="2" placeholder="12" value="12" aria-label="Hours">
+                <span class="time-separator">:</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-mins" maxlength="2" placeholder="00" value="00" aria-label="Minutes">
+                <button type="button" class="time-ampm-pill tp-ampm" aria-label="Toggle AM/PM">AM</button>
+                <input type="hidden" id="setting-daily-reset" value="00:00">
+              </div>
             </div>
           </div>
 
@@ -355,10 +371,13 @@
                 <label for="setting-notifications" class="setting-title">Notifications</label>
                 <div class="setting-subtext">Display proactive accountability check prompts.</div>
               </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="setting-notifications" checked>
-                <span class="toggle-slider"></span>
-              </label>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <button type="button" id="btn-test-notification" class="btn-secondary" style="font-size: 0.78rem; padding: 0.35rem 0.65rem;">🔔 Test Notification</button>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-notifications" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
             </div>
 
             <div class="setting-row">
@@ -451,8 +470,26 @@
         </div>
 
         <div class="form-group">
-          <label for="task-input-reminder" class="form-label">Reminder time (Optional)</label>
-          <input type="text" inputmode="numeric" id="task-input-reminder" class="form-input input-time" placeholder="e.g. 21:00 or 9:00 PM">
+          <label for="task-input-category" class="form-label">Task Category (Optional)</label>
+          <select id="task-input-category" class="form-select">
+            <option value="Study" selected>Study</option>
+            <option value="Health">Health</option>
+            <option value="College">College</option>
+            <option value="Personal">Personal</option>
+            <option value="Work">Work</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Reminder time (Optional)</label>
+          <div class="time-picker-box" id="tp-add-reminder">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-hours" maxlength="2" placeholder="09" value="" aria-label="Hours">
+            <span class="time-separator">:</span>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-mins" maxlength="2" placeholder="00" value="" aria-label="Minutes">
+            <button type="button" class="time-ampm-pill tp-ampm" aria-label="Toggle AM/PM">PM</button>
+            <input type="hidden" id="task-input-reminder" value="">
+          </div>
         </div>
 
         <div class="modal-footer">
@@ -483,6 +520,10 @@
         <div class="detail-property-row">
           <span class="detail-prop-label">Description:</span>
           <span id="detail-prop-description" class="detail-prop-val">-</span>
+        </div>
+        <div class="detail-property-row">
+          <span class="detail-prop-label">Category:</span>
+          <span id="detail-prop-category" class="detail-prop-val">-</span>
         </div>
         <div class="detail-property-row">
           <span class="detail-prop-label">Repeat:</span>
@@ -565,8 +606,26 @@
         </div>
 
         <div class="form-group">
-          <label for="edit-task-reminder" class="form-label">Reminder time (Optional)</label>
-          <input type="text" inputmode="numeric" id="edit-task-reminder" class="form-input input-time" placeholder="e.g. 21:00 or 9:00 PM">
+          <label for="edit-task-category" class="form-label">Task Category (Optional)</label>
+          <select id="edit-task-category" class="form-select">
+            <option value="Study">Study</option>
+            <option value="Health">Health</option>
+            <option value="College">College</option>
+            <option value="Personal">Personal</option>
+            <option value="Work">Work</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Reminder time (Optional)</label>
+          <div class="time-picker-box" id="tp-edit-reminder">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-hours" maxlength="2" placeholder="09" value="" aria-label="Hours">
+            <span class="time-separator">:</span>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" class="time-digit-input tp-mins" maxlength="2" placeholder="00" value="" aria-label="Minutes">
+            <button type="button" class="time-ampm-pill tp-ampm" aria-label="Toggle AM/PM">PM</button>
+            <input type="hidden" id="edit-task-reminder" value="">
+          </div>
         </div>
 
         <div class="modal-footer">
@@ -605,6 +664,16 @@
         <button id="btn-night-close" class="btn-secondary">Close</button>
       </div>
     </div>
+  </div>
+
+  <!-- Floating In-App Accountability Toast Notification -->
+  <div id="honest-inapp-toast" class="inapp-toast hidden" role="alert" aria-live="assertive">
+    <div class="toast-brand-icon">h</div>
+    <div class="toast-content-body">
+      <div class="toast-headline" id="toast-title">Be honest with yourself.</div>
+      <div class="toast-description" id="toast-body">You still have unfinished tasks today.</div>
+    </div>
+    <button type="button" class="toast-btn-dismiss" id="toast-close" aria-label="Dismiss">&times;</button>
   </div>
 
   <!-- Scripts -->

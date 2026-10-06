@@ -1399,3 +1399,171 @@ input:checked + .toggle-slider:before {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   TIME PICKER COMPONENT (Hours : Minutes AM/PM)
+   ========================================================================== */
+.time-picker-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.25rem 0.5rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  width: fit-content;
+}
+
+.time-picker-box:focus-within {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--text-primary);
+}
+
+.time-digit-input {
+  width: 44px;
+  height: 38px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0;
+  outline: none;
+}
+
+.time-digit-input:focus {
+  background-color: var(--bg-surface-elevated);
+  border-color: var(--border-active);
+}
+
+.time-separator {
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 0 0.15rem;
+  user-select: none;
+  line-height: 1;
+}
+
+.time-ampm-pill {
+  height: 32px;
+  padding: 0 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.time-ampm-pill:hover {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+/* Day Lock subtle reminder text */
+.lock-subtle-reminder {
+  font-size: 0.825rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* ==========================================================================
+   FLOATING IN-APP TOAST NOTIFICATION
+   ========================================================================== */
+.inapp-toast {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  max-width: 480px;
+  width: calc(100% - 2rem);
+  background-color: #000000;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  animation: slideDownToast 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="light"] .inapp-toast {
+  background-color: #111827;
+  color: #ffffff;
+}
+
+@keyframes slideDownToast {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.toast-brand-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: #000000;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.toast-content-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.toast-headline {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.toast-description {
+  font-size: 0.825rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+.toast-btn-dismiss {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.toast-btn-dismiss:hover {
+  color: #ffffff;
+}
+

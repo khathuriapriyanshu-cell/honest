@@ -17,57 +17,280 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastNotificationFiredTime = 0;
 
   // ==========================================
-  // Notification Service (Capacitor & Web)
+  // TIME PICKER COMPONENT (Hours : Minutes AM/PM)
+  // ==========================================
+  class TimePicker {
+    constructor(containerEl, isOptional = false) {
+      if (!containerEl) return;
+      this.container = containerEl;
+      this.isOptional = isOptional;
+      this.hoursInput = containerEl.querySelector('.tp-hours');
+      this.minsInput = containerEl.querySelector('.tp-mins');
+      this.ampmBtn = containerEl.querySelector('.tp-ampm');
+      this.hiddenInput = containerEl.querySelector('input[type="hidden"]');
+
+      this.initEvents();
+    }
+
+    initEvents() {
+      if (!this.hoursInput || !this.minsInput || !this.ampmBtn) return;
+
+      this.hoursInput.addEventListener('input', () => {
+        let val = this.hoursInput.value.replace(/\D/g, '');
+        if (val.length > 2) val = val.slice(0, 2);
+        this.hoursInput.value = val;
+
+        if (val.length === 2) {
+          let num = parseInt(val, 10);
+          if (num > 12) {
+            if (num <= 23) {
+              num = num - 12;
+              this.hoursInput.value = String(num).padStart(2, '0');
+              this.ampmBtn.textContent = 'PM';
+            } else {
+              this.hoursInput.value = '12';
+            }
+          } else if (num === 0) {
+            this.hoursInput.value = '12';
+            this.ampmBtn.textContent = 'AM';
+          }
+          this.minsInput.focus();
+          this.minsInput.select();
+        }
+        this.updateHidden();
+      });
+
+      this.minsInput.addEventListener('input', () => {
+        let val = this.minsInput.value.replace(/\D/g, '');
+        if (val.length > 2) val = val.slice(0, 2);
+        let num = parseInt(val, 10);
+        if (!isNaN(num) && num > 59) val = '59';
+        this.minsInput.value = val;
+        this.updateHidden();
+      });
+
+      this.minsInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && this.minsInput.value === '') {
+          this.hoursInput.focus();
+        }
+      });
+
+      this.ampmBtn.addEventListener('click', () => {
+        const cur = this.ampmBtn.textContent.trim().toUpperCase();
+        this.ampmBtn.textContent = cur === 'AM' ? 'PM' : 'AM';
+        this.updateHidden();
+      });
+
+      this.hoursInput.addEventListener('blur', () => this.formatPadded());
+      this.minsInput.addEventListener('blur', () => this.formatPadded());
+    }
+
+    formatPadded() {
+      if (this.hoursInput.value) {
+        let h = parseInt(this.hoursInput.value, 10) || 12;
+        if (h < 1) h = 12;
+        if (h > 12) h = 12;
+        this.hoursInput.value = String(h).padStart(2, '0');
+      }
+      if (this.minsInput.value) {
+        let m = parseInt(this.minsInput.value, 10) || 0;
+        if (m > 59) m = 59;
+        this.minsInput.value = String(m).padStart(2, '0');
+      }
+      this.updateHidden();
+    }
+
+    updateHidden() {
+      const hStr = this.hoursInput ? this.hoursInput.value.trim() : '';
+      const mStr = this.minsInput ? this.minsInput.value.trim() : '';
+      if (!hStr && !mStr && this.isOptional) {
+        if (this.hiddenInput) this.hiddenInput.value = '';
+        return;
+      }
+      let h = parseInt(hStr || '12', 10);
+      let m = parseInt(mStr || '00', 10);
+      const isPm = this.ampmBtn && this.ampmBtn.textContent.trim().toUpperCase() === 'PM';
+      if (isPm && h < 12) h += 12;
+      if (!isPm && h === 12) h = 0;
+      if (this.hiddenInput) {
+        this.hiddenInput.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
+
+    setValue(time24h) {
+      if (!time24h) {
+        if (this.isOptional) {
+          if (this.hoursInput) this.hoursInput.value = '';
+          if (this.minsInput) this.minsInput.value = '';
+          if (this.hiddenInput) this.hiddenInput.value = '';
+        }
+        return;
+      }
+      const parts = String(time24h).split(':');
+      let h = parseInt(parts[0], 10) || 0;
+      let m = parseInt(parts[1], 10) || 0;
+      const isPm = h >= 12;
+      let h12 = h % 12;
+      if (h12 === 0) h12 = 12;
+
+      if (this.hoursInput) this.hoursInput.value = String(h12).padStart(2, '0');
+      if (this.minsInput) this.minsInput.value = String(m).padStart(2, '0');
+      if (this.ampmBtn) this.ampmBtn.textContent = isPm ? 'PM' : 'AM';
+      if (this.hiddenInput) this.hiddenInput.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    getValue() {
+      this.updateHidden();
+      return this.hiddenInput ? this.hiddenInput.value : '';
+    }
+  }
+
+  // ==========================================
+  // NOTIFICATION SERVICE (Capacitor & Web)
   // ==========================================
   const NotificationService = {
-    async requestPermission() {
-      try {
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-          const { LocalNotifications } = window.Capacitor.Plugins;
-          const status = await LocalNotifications.requestPermissions();
-          return status.display === 'granted';
+    _plugin: null,
+
+    getPlugin() {
+      if (this._plugin) return this._plugin;
+      if (window.Capacitor) {
+        if (window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+          this._plugin = window.Capacitor.Plugins.LocalNotifications;
+          return this._plugin;
         }
-        if ('Notification' in window && Notification.permission !== 'granted') {
-          const perm = await Notification.requestPermission();
-          return perm === 'granted';
+        if (typeof window.Capacitor.registerPlugin === 'function') {
+          try {
+            this._plugin = window.Capacitor.registerPlugin('LocalNotifications');
+            return this._plugin;
+          } catch (e) {
+            console.warn('[HONEST] registerPlugin LocalNotifications error:', e);
+          }
+        }
+      }
+      return null;
+    },
+
+    async initChannel() {
+      try {
+        const plugin = this.getPlugin();
+        if (plugin && typeof plugin.createChannel === 'function') {
+          await plugin.createChannel({
+            id: 'honest_accountability',
+            name: 'Honest Accountability Reminders',
+            description: 'Accountability reminders for unfinished promises and reflections',
+            importance: 5,
+            visibility: 1,
+            vibration: true
+          });
         }
       } catch (err) {
-        console.warn('Could not request notification permissions:', err);
+        console.warn('[HONEST] initChannel error:', err);
+      }
+    },
+
+    async requestPermission() {
+      try {
+        await this.initChannel();
+        const plugin = this.getPlugin();
+        if (plugin && typeof plugin.requestPermissions === 'function') {
+          const res = await plugin.requestPermissions();
+          console.log('[HONEST] Capacitor permission result:', res);
+          return res.display === 'granted';
+        }
+        if ('Notification' in window) {
+          const res = await Notification.requestPermission();
+          return res === 'granted';
+        }
+      } catch (err) {
+        console.warn('[HONEST] requestPermission error:', err);
       }
       return false;
     },
 
-    async scheduleOrSendNotification(title, body) {
-      try {
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-          const { LocalNotifications } = window.Capacitor.Plugins;
-          await LocalNotifications.schedule({
+    async sendImmediateNotification(title, body) {
+      await this.initChannel();
+      let delivered = false;
+
+      // 1. Capacitor native notification
+      const plugin = this.getPlugin();
+      if (plugin && typeof plugin.schedule === 'function') {
+        try {
+          await plugin.schedule({
             notifications: [
               {
-                id: Math.floor(Math.random() * 100000) + 1,
+                id: Math.floor(Math.random() * 90000) + 1000,
                 title: title || 'HONEST',
-                body: body || 'Be honest with yourself. You still have unfinished tasks today.',
-                schedule: { at: new Date(Date.now() + 500) },
-                sound: null
+                body: body || 'Be honest with yourself.',
+                channelId: 'honest_accountability',
+                schedule: { at: new Date(Date.now() + 300), allowWhileIdle: true }
               }
             ]
           });
-          return;
+          delivered = true;
+        } catch (err) {
+          console.warn('[HONEST] Capacitor schedule failed:', err);
         }
+      }
 
-        if ('Notification' in window && Notification.permission === 'granted') {
+      // 2. Web browser notification
+      if (!delivered && 'Notification' in window && Notification.permission === 'granted') {
+        try {
           new Notification(title || 'HONEST', {
-            body: body || 'Be honest with yourself. You still have unfinished tasks today.',
+            body: body || 'Be honest with yourself.',
             icon: '/favicon.svg'
           });
+          delivered = true;
+        } catch (err) {
+          console.warn('[HONEST] Web Notification failed:', err);
         }
+      }
+
+      // 3. Always show prominent in-app toast banner
+      showInAppNotificationToast(title, body);
+      return delivered;
+    },
+
+    async scheduleDailyAlarms(checkingTime24h, incompleteTasks = []) {
+      const plugin = this.getPlugin();
+      if (!plugin || typeof plugin.schedule !== 'function') return;
+
+      try {
+        await this.initChannel();
+        if (typeof plugin.cancel === 'function') {
+          await plugin.cancel({ notifications: [{ id: 9001 }] });
+        }
+
+        const [chH, chM] = (checkingTime24h || '22:30').split(':').map(Number);
+        const now = new Date();
+        const checkDate = new Date();
+        checkDate.setHours(chH, chM, 0, 0);
+        if (checkDate <= now) {
+          checkDate.setDate(checkDate.getDate() + 1);
+        }
+
+        const taskNames = incompleteTasks.map(t => `- ${t.title || t.name}`).join('\n');
+        const bodyText = incompleteTasks.length > 0
+          ? `You still haven't completed:\n${taskNames}\n\nYou still have time. Complete them if you can.`
+          : 'Be honest with yourself. You still have unfinished promises today.';
+
+        await plugin.schedule({
+          notifications: [
+            {
+              id: 9001,
+              title: 'Be honest with yourself.',
+              body: bodyText,
+              channelId: 'honest_accountability',
+              schedule: { at: checkDate, allowWhileIdle: true }
+            }
+          ]
+        });
       } catch (err) {
-        console.warn('Could not schedule local notification:', err);
+        console.warn('[HONEST] scheduleDailyAlarms error:', err);
       }
     }
   };
 
-  // Helper: Normalize keyboard time inputs (e.g. 22:30, 10:30 PM, 10:30) to HH:MM 24h
+  // Helper: Normalize keyboard time inputs to HH:MM 24h
   function normalizeTimeInput(val) {
     if (!val) return '';
     val = val.trim().toLowerCase();
@@ -138,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const formAddTask = document.getElementById('form-add-task');
   const taskRepeatRadios = document.querySelectorAll('input[name="task-repeat"]');
   const taskSelectedDaysWrap = document.getElementById('task-selected-days-wrap');
+  const taskInputCategory = document.getElementById('task-input-category');
   const taskInputReminder = document.getElementById('task-input-reminder');
 
   // Task Details Modal
@@ -146,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnDetailClose = document.getElementById('btn-detail-close');
   const taskDetailTitle = document.getElementById('task-detail-title');
   const detailPropDescription = document.getElementById('detail-prop-description');
+  const detailPropCategory = document.getElementById('detail-prop-category');
   const detailPropRepeat = document.getElementById('detail-prop-repeat');
   const detailPropReminder = document.getElementById('detail-prop-reminder');
   const detailPropCreated = document.getElementById('detail-prop-created');
@@ -160,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const editTaskId = document.getElementById('edit-task-id');
   const editTaskTitle = document.getElementById('edit-task-title');
   const editTaskDescription = document.getElementById('edit-task-description');
+  const editTaskCategory = document.getElementById('edit-task-category');
   const editTaskReminder = document.getElementById('edit-task-reminder');
   const editTaskRepeatRadios = document.querySelectorAll('input[name="edit-task-repeat"]');
   const editSelectedDaysWrap = document.getElementById('edit-selected-days-wrap');
@@ -195,11 +421,42 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingDailyReset = document.getElementById('setting-daily-reset');
   const settingUsername = document.getElementById('setting-username');
   const settingNotifications = document.getElementById('setting-notifications');
+  const btnTestNotification = document.getElementById('btn-test-notification');
   const settingTheme = document.getElementById('setting-theme');
   const settingApiUrl = document.getElementById('setting-api-url');
   const settingsStatusMsg = document.getElementById('settings-status-msg');
   const backendStatusIndicator = document.getElementById('backend-status-indicator');
   const backendStatusLabel = backendStatusIndicator ? backendStatusIndicator.querySelector('.status-label') : null;
+
+  // Floating In-App Toast Elements
+  const inappToast = document.getElementById('honest-inapp-toast');
+  const toastTitle = document.getElementById('toast-title');
+  const toastBody = document.getElementById('toast-body');
+  const toastClose = document.getElementById('toast-close');
+
+  function showInAppNotificationToast(title, body) {
+    if (!inappToast) return;
+    if (toastTitle) toastTitle.textContent = title || 'Be honest with yourself.';
+    if (toastBody) toastBody.textContent = body || 'You still have unfinished tasks today.';
+    inappToast.classList.remove('hidden');
+
+    clearTimeout(inappToast._timer);
+    inappToast._timer = setTimeout(() => {
+      inappToast.classList.add('hidden');
+    }, 7000);
+  }
+
+  if (toastClose) {
+    toastClose.addEventListener('click', () => {
+      if (inappToast) inappToast.classList.add('hidden');
+    });
+  }
+
+  // Instantiate TimePickers
+  const timePickerAccountability = new TimePicker(document.getElementById('tp-accountability-time'));
+  const timePickerDailyReset = new TimePicker(document.getElementById('tp-daily-reset'));
+  const timePickerAddReminder = new TimePicker(document.getElementById('tp-add-reminder'), true);
+  const timePickerEditReminder = new TimePicker(document.getElementById('tp-edit-reminder'), true);
 
   // Connection Indicator Listener
   ApiService.onConnectionChange((isConnected, url) => {
@@ -228,12 +485,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Request notifications permission on start
   NotificationService.requestPermission();
 
-  // Periodic accountability check (every 30 seconds)
+  // Periodic accountability check (every 10 seconds)
   setInterval(() => {
-    if (todayState && currentView === 'view-today') {
+    if (todayState) {
       evaluateNightCheck(todayState);
     }
-  }, 30000);
+  }, 10000);
 
   // ==========================================
   // Theme Management
@@ -439,7 +696,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const tasks = state.tasks || [];
     const incomplete = tasks.filter(t => !t.completed);
 
-    if (state.nightCheckActive && incomplete.length > 0) {
+    // Evaluate current time against checking time
+    const now = new Date();
+    const curMins = now.getHours() * 60 + now.getMinutes();
+    const accTimeStr = (state.settings && state.settings.accountabilityTime) || timePickerAccountability.getValue() || '22:30';
+    const [accH, accM] = accTimeStr.split(':').map(Number);
+    const accMins = (accH || 22) * 60 + (accM || 30);
+
+    const isPastCheckTime = curMins >= accMins;
+    const shouldShowCheck = (state.nightCheckActive || isPastCheckTime) && incomplete.length > 0;
+
+    if (shouldShowCheck) {
       nightCheckPromptBanner.classList.remove('hidden');
       nightCheckPromptText.textContent = `You still have ${incomplete.length} unfinished ${incomplete.length === 1 ? 'task' : 'tasks'} today.`;
       globalNotification.classList.remove('hidden');
@@ -448,9 +715,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const nowMs = Date.now();
       if (nowMs - lastNotificationFiredTime > 10 * 60 * 1000) {
         lastNotificationFiredTime = nowMs;
-        NotificationService.scheduleOrSendNotification(
-          'HONEST',
-          'Be honest with yourself. You still have unfinished tasks today.'
+        const taskListStr = incomplete.map(t => `- ${t.title || t.name}`).join('\n');
+        const bodyText = `You still haven't completed:\n${taskListStr}\n\nYou still have time. Complete them if you can.`;
+        NotificationService.sendImmediateNotification(
+          'Be honest with yourself.',
+          bodyText
         );
       }
     } else {
@@ -529,6 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedTask = task;
     taskDetailTitle.textContent = task.title || task.name;
     detailPropDescription.textContent = task.definition || 'None';
+    if (detailPropCategory) detailPropCategory.textContent = task.category || 'Study';
     detailPropRepeat.textContent = (task.repeat === 'daily' || task.repeat === 'everyday') ? 'Every day' : task.repeat === 'selected' ? 'Specific days' : 'One time';
     detailPropReminder.textContent = task.reminderTime || task.reminder || 'None';
     detailPropCreated.textContent = task.startDate || task.createdDate || task.date || 'Today';
@@ -560,7 +830,8 @@ document.addEventListener('DOMContentLoaded', () => {
     editTaskId.value = selectedTask.id;
     editTaskTitle.value = selectedTask.title || selectedTask.name;
     editTaskDescription.value = selectedTask.definition || selectedTask.description || '';
-    editTaskReminder.value = selectedTask.reminderTime || selectedTask.reminder || '';
+    if (editTaskCategory) editTaskCategory.value = selectedTask.category || 'Study';
+    timePickerEditReminder.setValue(selectedTask.reminderTime || selectedTask.reminder || '');
 
     const repeatVal = selectedTask.repeat || 'everyday';
     const matchingRadio = document.querySelector(`input[name="edit-task-repeat"][value="${repeatVal === 'everyday' ? 'daily' : repeatVal}"]`);
@@ -590,7 +861,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = editTaskId.value;
     const title = editTaskTitle.value.trim();
     const description = editTaskDescription.value.trim();
-    const reminder = normalizeTimeInput(editTaskReminder.value) || null;
+    const category = editTaskCategory ? editTaskCategory.value : 'Study';
+    const reminder = timePickerEditReminder.getValue() || null;
     const repeatRadio = document.querySelector('input[name="edit-task-repeat"]:checked');
     const repeat = repeatRadio ? repeatRadio.value : 'daily';
 
@@ -605,6 +877,7 @@ document.addEventListener('DOMContentLoaded', () => {
       name: title,
       definition: description || 'Complete as intended',
       description,
+      category,
       repeat,
       selectedDays,
       reminderTime: reminder,
@@ -623,8 +896,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   // ADD TASK MODAL
   // ==========================================
-  btnOpenAddTask.addEventListener('click', () => openModal(modalAddTask));
-  btnEmptyAddTask.addEventListener('click', () => openModal(modalAddTask));
+  const prepareAddTask = () => {
+    formAddTask.reset();
+    timePickerAddReminder.setValue('');
+    if (taskInputCategory) taskInputCategory.value = 'Study';
+    taskSelectedDaysWrap.classList.add('hidden');
+    openModal(modalAddTask);
+  };
+
+  btnOpenAddTask.addEventListener('click', prepareAddTask);
+  btnEmptyAddTask.addEventListener('click', prepareAddTask);
   modalAddTaskClose.addEventListener('click', () => closeModal(modalAddTask));
   modalAddTaskCancel.addEventListener('click', () => closeModal(modalAddTask));
 
@@ -638,7 +919,8 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const title = document.getElementById('task-input-title').value.trim();
     const description = document.getElementById('task-input-description').value.trim();
-    const reminder = normalizeTimeInput(taskInputReminder.value) || null;
+    const category = taskInputCategory ? taskInputCategory.value : 'Study';
+    const reminder = timePickerAddReminder.getValue() || null;
     const repeatRadio = document.querySelector('input[name="task-repeat"]:checked');
     const repeat = repeatRadio ? repeatRadio.value : 'everyday';
 
@@ -653,12 +935,12 @@ document.addEventListener('DOMContentLoaded', () => {
       name: title,
       definition: description || 'Complete as intended',
       description,
+      category,
       repeat,
       selectedDays,
       reminderTime: reminder,
       reminder,
-      category: 'Focus',
-      accountabilityTime: '22:30'
+      accountabilityTime: timePickerAccountability.getValue() || '22:30'
     };
 
     try {
@@ -913,8 +1195,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await ApiService.getSettings();
       const s = res.data || res;
-      if (s.accountabilityTime) settingAccountabilityTime.value = s.accountabilityTime;
-      if (s.dailyReset) settingDailyReset.value = s.dailyReset;
+      if (s.accountabilityTime) {
+        timePickerAccountability.setValue(s.accountabilityTime);
+      }
+      if (s.dailyReset) {
+        timePickerDailyReset.setValue(s.dailyReset);
+      }
       if (s.notifications !== undefined) settingNotifications.checked = s.notifications;
       if (s.theme) settingTheme.value = s.theme;
       if (settingApiUrl) settingApiUrl.value = s.apiUrl || ApiService.getBaseUrl() || '';
@@ -932,6 +1218,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  if (btnTestNotification) {
+    btnTestNotification.addEventListener('click', async () => {
+      await NotificationService.requestPermission();
+      const unfinished = (todayState && todayState.tasks) ? todayState.tasks.filter(t => !t.completed) : [];
+      const taskNames = unfinished.length > 0 ? unfinished.map(t => `- ${t.title || t.name}`).join('\n') : '- DSA Practice\n- Workout';
+      const body = `You still haven't completed:\n${taskNames}\n\nYou still have time. Complete them if you can.`;
+      await NotificationService.sendImmediateNotification(
+        'Be honest with yourself.',
+        body
+      );
+      settingsStatusMsg.textContent = 'Test notification sent!';
+      setTimeout(() => { settingsStatusMsg.textContent = ''; }, 3000);
+    });
+  }
+
   settingsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     settingsStatusMsg.textContent = 'Saving...';
@@ -941,10 +1242,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const customApi = settingApiUrl ? settingApiUrl.value.trim() : '';
     ApiService.setBaseUrl(customApi);
 
-    const normAcc = normalizeTimeInput(settingAccountabilityTime.value) || '22:30';
-    const normReset = normalizeTimeInput(settingDailyReset.value) || '00:00';
-    settingAccountabilityTime.value = normAcc;
-    settingDailyReset.value = normReset;
+    const normAcc = timePickerAccountability.getValue() || '22:30';
+    const normReset = timePickerDailyReset.getValue() || '00:00';
+
+    if (settingNotifications.checked) {
+      await NotificationService.requestPermission();
+    }
 
     const payload = {
       accountabilityTime: normAcc,
@@ -956,6 +1259,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       await ApiService.updateSettings(payload);
+      const incomplete = (todayState && todayState.tasks) ? todayState.tasks.filter(t => !t.completed) : [];
+      NotificationService.scheduleDailyAlarms(normAcc, incomplete);
+
       settingsStatusMsg.textContent = 'Settings saved.';
       setTimeout(() => { settingsStatusMsg.textContent = ''; }, 3000);
       loadTodayData();

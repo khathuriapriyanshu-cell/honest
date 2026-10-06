@@ -274,7 +274,7 @@ const ApiService = (function () {
         name: payload.title || payload.name || 'Untitled Promise',
         description: payload.description || '',
         definition: payload.definition || payload.description || '',
-        category: payload.category || 'Focus',
+        category: payload.category || 'Study',
         repeat: payload.repeat || 'everyday',
         repeatDays: payload.repeatDays || [],
         completed: false,
@@ -319,7 +319,9 @@ const ApiService = (function () {
           ...localState.tasks[idx],
           ...payload,
           title: payload.title || payload.name || localState.tasks[idx].title,
-          name: payload.title || payload.name || localState.tasks[idx].title
+          name: payload.title || payload.name || localState.tasks[idx].title,
+          category: payload.category || localState.tasks[idx].category || 'Study',
+          reminderTime: payload.reminderTime !== undefined ? payload.reminderTime : localState.tasks[idx].reminderTime
         };
         savePersistedState();
         return localState.tasks[idx];
@@ -402,9 +404,10 @@ const ApiService = (function () {
       };
     }
 
-    // GET /calendar/day/:date
-    if (endpoint.startsWith('/calendar/day/') && method === 'GET') {
-      const dateStr = endpoint.split('/')[3];
+    // GET /calendar/day/:date or /calendar/:date (YYYY-MM-DD)
+    if ((endpoint.startsWith('/calendar/day/') || /^\/calendar\/\d{4}-\d{2}-\d{2}/.test(endpoint)) && method === 'GET') {
+      const parts = endpoint.split('/');
+      const dateStr = parts[parts.length - 1];
 
       // If clicked on today
       if (dateStr === localState.isoDate) {

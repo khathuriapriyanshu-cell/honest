@@ -3,7 +3,7 @@
 const dayService = require('../services/dayService');
 const statsService = require('../services/statsService');
 const notificationService = require('../services/notificationService');
-const { getRuntimeSettings } = require('../services/settingsService');
+const { getRuntimeSettings, getSettings } = require('../services/settingsService');
 
 /**
  * Shared route helpers.
@@ -31,20 +31,20 @@ function dayStatePayload(deps, date = null) {
   };
 }
 
-/** Settings plus the server's resolved view of time - the frontend never guesses. */
+/**
+ * Settings plus the server's resolved view of time - the frontend never guesses.
+ *
+ * Built by spreading `getSettings()` rather than listing fields by hand, so any
+ * field the settings service adds (the mobile aliases `dailyCheckTime` /
+ * `dayResetTime`, or the client-owned `apiUrl`) is surfaced here automatically
+ * instead of being silently dropped.
+ */
 function publicSettings(deps) {
   const { db, clock } = deps;
   const runtime = getRuntimeSettings(db);
   return {
-    accountabilityTime: runtime.accountabilityTime,
-    dailyReset: runtime.dailyReset,
-    gracePeriod: runtime.gracePeriod,
-    notifications: runtime.notifications,
-    weekStart: runtime.weekStart,
-    theme: runtime.theme,
-    timezone: runtime.timezone,
+    ...getSettings(db),
     timezoneResolved: runtime.resolvedTimezone,
-    offDayCutoff: runtime.offDayCutoff,
     serverDate: clock.today(runtime.resolvedTimezone),
     serverTime: clock.currentHhmm(runtime.resolvedTimezone),
   };

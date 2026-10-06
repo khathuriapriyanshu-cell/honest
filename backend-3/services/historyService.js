@@ -131,6 +131,10 @@ function dayDetail({ db, clock }, dateInput) {
     category: item.displayTask.category,
     definition: item.displayTask.minimumCompletion || null,
     completed: item.completed,
+    // Compact two-value status for clients that only distinguish kept/missed.
+    // A missed-but-explained promise is still `missed`; check `state` for the
+    // finer distinction.
+    status: item.completed ? 'completed' : 'missed',
     explained: item.explained,
     unresolved: item.unresolved,
     state: item.state,
@@ -138,9 +142,15 @@ function dayDetail({ db, clock }, dateInput) {
     reflectedAt: item.occurrence ? item.occurrence.reflectedAt : null,
   }));
 
-  const reflections = all(db, 'SELECT * FROM reflections WHERE date = ? ORDER BY id ASC', [date]).map(
-    reflectionService.toApiShape
-  );
+  const reflectionRows = all(db, 'SELECT * FROM reflections WHERE date = ? ORDER BY id ASC', [date]);
+  const reflections = reflectionRows.map(reflectionService.toApiShape);
+
+  // Distinct reasons, in order, so a reason recorded once is never repeated in
+  // the day summary even when it covered several promises.
+  const distinctReasons = [];
+  for (const reflection of reflections) {
+    if (!distinctReasons.includes(reflection.reason)) distinctReasons.push(reflection.reason);
+  }
 
   const offDay = day.isOffDay
     ? { reason: day.offDay.reason, activatedAt: day.offDay.activatedAt }
@@ -156,7 +166,7 @@ function dayDetail({ db, clock }, dateInput) {
     explained: day.counts.explained,
     unresolved: day.counts.unresolved,
     tasks,
-    reflection: reflections.length > 0 ? reflections.map((r) => r.reason).join(' | ') : null,
+    reflection: distinctReasons.length > 0 ? distinctReasons.join(' | ') : null,
     reflections,
     isOffDay: day.isOffDay,
     offDay,

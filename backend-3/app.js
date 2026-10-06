@@ -58,7 +58,8 @@ const API_INDEX = {
   ],
   history: [
     { method: 'GET', path: '/api/calendar?month=&year=', purpose: 'Month overview with per-day status' },
-    { method: 'GET', path: '/api/calendar/day/:date', purpose: 'Detailed history for one day' },
+    { method: 'GET', path: '/api/calendar/:date', purpose: 'Detailed history for one day (YYYY-MM-DD)' },
+    { method: 'GET', path: '/api/calendar/day/:date', purpose: 'The same day detail' },
     { method: 'GET', path: '/api/history?from=&to=', purpose: 'Flat range history' },
     { method: 'GET', path: '/api/archive?q=', purpose: 'Reflection archive with keyword search' },
   ],

@@ -94,6 +94,7 @@ promises were affected). Database internals, SQL and table names are never expos
 | 400 | `INVALID_DATE_RANGE` | `endDate` before `startDate` |
 | 400 | `MALFORMED_JSON` | the body is not valid JSON |
 | 400 | `UNKNOWN_SETTING` | a settings key the API does not define |
+| 400 | `CONFLICTING_SETTING` | the same setting was sent under two names with different values |
 | 400 | `COMPLETION_IN_FUTURE` | a promise cannot be completed for a day that has not happened |
 | 400 | `TASK_NOT_SCHEDULED` | that promise does not fall on that weekday |
 | 400 | `OFF_DAY_TOO_FAR_AHEAD` | off days can be planned at most 30 days ahead |
@@ -576,19 +577,93 @@ rather than creating a duplicate.
 | Code | When |
 | --- | --- |
 | `400 MISSING_FIELD` / `INVALID_REFLECTION` | missing, blank, too short or too long |
-| `400 TASK_NOT_ON_DATE` | a `taskIds` entry is not part of that day |
+| `400 TASK_NOT_ON_DATE` | a `taskIds` or `missedTasks` entry is not part of that day (the response lists what is) |
 | `400 REFLECTION_IN_FUTURE` | the date has not happened yet |
 | `409 NOTHING_TO_REFLECT_ON` | nothing is unresolved on that date |
 | `409 TASK_ALREADY_RESOLVED` | that promise is already completed or explained |
 | `409 OFF_DAY_NO_REFLECTION_NEEDED` | the day is an off day |
 
-`POST /api/reflections` is accepted as an alias.
+`POST /api/reflections` is accepted as an alias and takes the mobile client's field names:
+
+```json
+{
+  "date": "2026-10-03",
+  "reason": "Got back late from college and club work ran long.",
+  "missedTasks": ["Revision", "Workout"]
+}
+```
+
+`missedTasks` may contain promise **names** (matched case-insensitively, ignoring extra spaces) or
+numeric **ids** as strings — whichever the client naturally holds. An entry that does not match a
+promise on that day is rejected with `400 TASK_NOT_ON_DATE` rather than being silently ignored, so a
+typo cannot leave a promise looking unexplained. `taskIds` (numeric array) remains supported, and
+`missed_tasks` / `tasks` are accepted as aliases.
+
+Every request that succeeds writes the reason to the database permanently, marks each named promise
+as `missed_explained`, and returns `remainingUnresolved: 0` once the whole day is accounted for —
+which is what flips the day's status to `explained`.
 
 ### `GET /api/reflections`
 
-**Query parameters** — `from`, `to`, `taskId`, `limit` (max 500).
+Every recorded reason, **newest day first**, grouped by day. One reason can cover several promises,
+so the day is the unit a history view cares about.
 
-**Response `200`** — `{ "count": 2, "reflections": [ { …reflection… } ] }`, newest first.
+**Query parameters**
+
+| Name | Meaning |
+| --- | --- |
+| `from`, `to` | restrict to a date range |
+| `taskId` | only days that included that promise |
+| `q` (or `query`) | case-insensitive match against the reason or a promise name |
+| `limit` | max days (default 200, max 2000) |
+
+**Response `200`**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "date": "2026-10-03",
+      "isoDate": "2026-10-03",
+      "dateLabel": "October 3, 2026",
+      "reason": "Had a college event and returned late.",
+      "missedTasks": ["Revision", "Workout"],
+      "missedTaskIds": ["5", "2"],
+      "reflectionIds": ["3", "4"],
+      "reflectionCount": 2,
+      "sources": ["night_check"],
+      "createdAt": "2026-10-04T02:15:00Z"
+    },
+    {
+      "date": "2026-10-01",
+      "isoDate": "2026-10-01",
+      "dateLabel": "October 1, 2026",
+      "reason": "Too tired after traveling back from lab.",
+      "missedTasks": ["DSA Practice"],
+      "missedTaskIds": ["4"],
+      "reflectionIds": ["1"],
+      "reflectionCount": 1,
+      "sources": ["night_check"],
+      "createdAt": "2026-10-02T02:05:00Z"
+    }
+  ],
+  "reflections": ["the same array, mirrored for older clients"],
+  "total": 2,
+  "count": 2
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `date` | ISO date (`YYYY-MM-DD`); `dateLabel` is the display form |
+| `reason` | the day's reasons joined with `" | "` when more than one distinct sentence was recorded |
+| `missedTasks` | the promises that reason covered, in the order the day displayed them |
+| `reflectionCount` | how many promises were explained that day |
+
+> The **Honest Archive** (`GET /api/archive`) is unchanged: it returns per-promise entries with
+> `taskName`, `date`, `reason` and a `patternNotice`. Use `/api/reflections` for a day-grouped
+> history and `/api/archive` for keyword search over individual reasons.
 
 ### `GET /api/notifications`
 
@@ -804,46 +879,77 @@ the day cells.
 
 **Errors** — `400 INVALID_FIELD` for an out-of-range month or year.
 
-### `GET /api/calendar/day/:date`
+### `GET /api/calendar/day/:date` · `GET /api/calendar/:date`
 
-Detailed history for one day — the day-detail panel.
+Detailed history for one day — the day-detail panel. Both paths return the identical payload; the
+short form exists for the mobile client.
+
+**Path parameters** — `date`: `YYYY-MM-DD`. The short form refuses anything that is not a date with
+`400 INVALID_DATE`, and reserves the literals `day`, `month`, `week` and `today`, so
+`/api/calendar/day/2026-10-05` can never be misread as a date.
 
 **Response `200`**
 
 ```json
 {
   "success": true,
-  "date": "2026-10-03",
-  "dateLabel": "Saturday - 3 October",
-  "status": "explained",
-  "completed": 4,
-  "total": 5,
-  "missed": 1,
-  "explained": 1,
-  "unresolved": 0,
-  "tasks": [
-    { "id": "1", "taskId": 1, "title": "Coding", "name": "Coding", "category": "DSA",
-      "definition": "At least 45 minutes", "completed": true, "explained": false,
-      "unresolved": false, "state": "completed",
-      "completedAt": "2026-10-03T18:20:00Z", "reflectedAt": null },
-    { "id": "5", "taskId": 5, "title": "Revision", "name": "Revision", "category": "Study",
-      "definition": null, "completed": false, "explained": true,
-      "unresolved": false, "state": "missed_explained",
-      "completedAt": null, "reflectedAt": "2026-10-04T02:15:00Z" }
-  ],
-  "reflection": "Had a college event and returned late.",
-  "reflections": [ { "id": "3", "date": "October 3, 2026", "isoDate": "2026-10-03",
-                     "taskId": "5", "taskName": "Revision",
-                     "reason": "Had a college event and returned late." } ],
-  "isOffDay": false,
-  "offDay": null,
-  "isHonestDay": true,
-  "timezone": "Asia/Kolkata"
+  "data": {
+    "date": "2026-10-03",
+    "dateLabel": "Saturday - 3 October",
+    "status": "explained",
+    "completed": 4,
+    "total": 5,
+    "missed": 1,
+    "explained": 1,
+    "unresolved": 0,
+    "tasks": [
+      {
+        "id": "1", "taskId": 1,
+        "name": "Coding", "title": "Coding",
+        "category": "DSA", "definition": "At least 45 minutes",
+        "status": "completed", "completed": true,
+        "completedAt": "2026-10-03T18:20:00Z",
+        "explained": false, "unresolved": false,
+        "state": "completed", "reflectedAt": null
+      },
+      {
+        "id": "5", "taskId": 5,
+        "name": "Revision", "title": "Revision",
+        "category": "Study", "definition": null,
+        "status": "missed", "completed": false,
+        "completedAt": null,
+        "explained": true, "unresolved": false,
+        "state": "missed_explained", "reflectedAt": "2026-10-04T02:15:00Z"
+      }
+    ],
+    "reflection": "Had a college event and returned late.",
+    "reflections": [
+      { "id": "3", "date": "October 3, 2026", "isoDate": "2026-10-03",
+        "taskId": "5", "taskName": "Revision",
+        "reason": "Had a college event and returned late." }
+    ],
+    "isOffDay": false,
+    "offDay": null,
+    "isHonestDay": true,
+    "timezone": "Asia/Kolkata"
+  },
+  "tasks": ["the same payload is mirrored at the top level"],
+  "reflection": "Had a college event and returned late."
 }
 ```
 
-`reflection` is a single convenience string (reasons joined with ` | `) for the frontend's
-one-paragraph panel; `reflections` is the structured list.
+**Field notes**
+
+| Field | Meaning |
+| --- | --- |
+| `status` | day level: `completed` · `explained` · `unresolved` · `offday` · `active` (today, in progress) · `empty` |
+| `tasks[].status` | promise level, two-valued on purpose: `completed` or `missed` |
+| `tasks[].completedAt` | when it was marked done, or `null` |
+| `tasks[].state` | the finer distinction: `completed` · `missed_explained` · `missed_unexplained` · `pending` · `off_day` |
+| `reflection` | every **distinct** reason for the day joined with `" | "`, or `null` — a sentence recorded once is never repeated |
+
+> Today reports `status: "active"` because the day is still in progress; the `completed` /
+> `total` / `unresolved` counts are always present, so no information is lost.
 
 **Errors** — `400 INVALID_DATE`, `400 DATE_IN_FUTURE`.
 
@@ -1077,6 +1183,8 @@ supports it — otherwise `patterns` is empty and `emptyMessage` explains why.
   "success": true,
   "accountabilityTime": "22:30",
   "dailyReset": "00:00",
+  "dailyCheckTime": "22:30",
+  "dayResetTime": "00:00",
   "gracePeriod": 15,
   "notifications": true,
   "weekStart": "monday",
@@ -1084,6 +1192,7 @@ supports it — otherwise `patterns` is empty and `emptyMessage` explains why.
   "timezone": "auto",
   "timezoneResolved": "Asia/Kolkata",
   "offDayCutoff": "00:00",
+  "apiUrl": null,
   "serverDate": "2026-10-05",
   "serverTime": "21:12"
 }
@@ -1093,14 +1202,48 @@ supports it — otherwise `patterns` is empty and `emptyMessage` explains why.
 | --- | --- | --- | --- |
 | `accountabilityTime` | `HH:MM` | `22:30` | when the evening check opens |
 | `dailyReset` | `HH:MM` | `00:00` | when one day becomes the next |
+| `dailyCheckTime` | alias | — | the mobile client's name for `accountabilityTime`; always mirrors it |
+| `dayResetTime` | alias | — | the mobile client's name for `dailyReset`; always mirrors it |
 | `gracePeriod` | 0–240 minutes | `15` | the final stretch, measured backwards from `dailyReset` |
 | `notifications` | boolean | `true` | whether accountability events are produced |
 | `weekStart` | `monday` · `sunday` | `monday` | affects weekly reports and week grouping |
 | `theme` | `dark` · `light` | `dark` | stored for the client |
 | `timezone` | IANA name or `auto` | `auto` | drives **every** date-sensitive rule |
 | `offDayCutoff` | `HH:MM` or empty | empty → `dailyReset` | the deadline for declaring an off day |
+| `apiUrl` | string or `null` | `null` | client-owned: echoed back, never stored on the server |
 
 `timezoneResolved`, `serverDate` and `serverTime` are read-only conveniences computed by the server.
+The two aliases are **derived**, not stored: there is only one value, so the names can never drift
+apart.
+
+### `PUT /api/settings` · `PATCH /api/settings`
+
+Send a partial or complete object. Only the fields above are accepted; anything else is rejected
+(`400 UNKNOWN_SETTING`) rather than silently ignored, so a frontend typo is caught immediately.
+
+```json
+{ "accountabilityTime": "23:00", "gracePeriod": 20, "weekStart": "sunday",
+  "theme": "light", "notifications": true, "timezone": "Asia/Kolkata" }
+```
+
+The mobile spellings are equally valid — these two requests are equivalent:
+
+```json
+{ "dailyCheckTime": "22:45", "dayResetTime": "03:30" }
+```
+
+```json
+{ "accountabilityTime": "22:45", "dailyReset": "03:30" }
+```
+
+Sending **both** names for the same setting with **different** values is refused
+(`400 CONFLICTING_SETTING`) instead of silently picking one. `apiUrl` is accepted and ignored (it is
+the client's own configuration).
+
+**Response `200`** — `{ "success": true, "settings": { …full settings… } }`
+
+**Errors** — `400 MISSING_FIELD`, `INVALID_TIME`, `INVALID_FIELD`, `INVALID_TIMEZONE`,
+`UNKNOWN_SETTING`, `CONFLICTING_SETTING`.
 
 ### `PUT /api/settings` · `PATCH /api/settings`
 
@@ -1115,7 +1258,7 @@ Send a partial or complete object. Only the fields above are accepted; anything 
 **Response `200`** — `{ "success": true, "settings": { …full settings… } }`
 
 **Errors** — `400 MISSING_FIELD`, `INVALID_TIME`, `INVALID_FIELD`, `INVALID_TIMEZONE`,
-`UNKNOWN_SETTING`.
+`UNKNOWN_SETTING`, `CONFLICTING_SETTING`, `400 MALFORMED_JSON`.
 
 **Business meaning** — a settings change takes effect for subsequent requests immediately, including
 the timezone. Nothing is written unless every supplied field validates.

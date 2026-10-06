@@ -76,7 +76,9 @@ function createNightCheckRoutes(deps) {
     const result = reflectionService.submitReflection(deps, {
       reason: body.reason ?? body.reflection,
       date,
+      // Accepts promise ids (web client) or promise names (mobile client).
       taskIds: body.taskIds ?? body.task_ids,
+      missedTasks: body.missedTasks ?? body.missed_tasks ?? body.tasks,
       source: body.source,
     });
     return ok(res, result, 200, { message: result.message });
@@ -85,14 +87,42 @@ function createNightCheckRoutes(deps) {
   router.post('/night-check/reflect', reflect);
   router.post('/reflections', reflect);
 
+  /**
+   * GET /api/reflections
+   *
+   * Every recorded reason, newest day first, grouped by day:
+   *
+   *   data: [ { date, reason, missedTasks: [...] } ]
+   *
+   * A reason can cover several promises, so the day is the unit a history view
+   * cares about. `data` is the array itself (as the mobile client expects) while
+   * `reflections` mirrors it for clients written against the older key.
+   */
   router.get('/reflections', (req, res) => {
-    const reflections = reflectionService.listReflections(deps.db, {
+    const days = reflectionService.listReflections(deps.db, {
       from: queryValue(req, 'from'),
       to: queryValue(req, 'to'),
       taskId: queryValue(req, 'taskId'),
       limit: queryValue(req, 'limit') || 200,
     });
-    return ok(res, { count: reflections.length, reflections });
+
+    // Optional filters that only make sense per item, applied after grouping.
+    const query = queryValue(req, 'q') || queryValue(req, 'query');
+    const term = query ? query.toLowerCase() : null;
+    const filtered = term
+      ? days.filter(
+          (day) =>
+            day.reason.toLowerCase().includes(term) ||
+            day.missedTasks.some((name) => name.toLowerCase().includes(term))
+        )
+      : days;
+
+    return ok(
+      res,
+      { reflections: filtered, total: filtered.length, count: filtered.length },
+      200,
+      { data: filtered }
+    );
   });
 
   return router;

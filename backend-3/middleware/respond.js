@@ -4,18 +4,23 @@
  * Response envelope.
  *
  * Every successful response carries `success: true`, the top-level payload
- * fields documented in API.md, and an identical copy under `data`. Clients that
- * prefer the documented flat shape and clients that prefer `{ success, data }`
- * both work against the same endpoint - there is never a second, divergent
- * representation of the same numbers.
+ * fields documented in API.md, and a copy under `data`. Clients that prefer the
+ * documented flat shape and clients that prefer `{ success, data }` both work
+ * against the same endpoint - there is never a second, divergent representation
+ * of the same numbers.
+ *
+ * `extra.data` overrides the default mirror, which lets an endpoint present an
+ * array as its documented `data` value (see GET /api/reflections) while the
+ * top-level fields stay available for older clients.
  */
 
 function ok(res, payload = {}, status = 200, extra = {}) {
+  const { data: explicitData, ...rest } = extra;
   const body = {
     success: true,
     ...payload,
-    ...extra,
-    data: payload,
+    ...rest,
+    data: explicitData !== undefined ? explicitData : payload,
   };
   return res.status(status).json(body);
 }

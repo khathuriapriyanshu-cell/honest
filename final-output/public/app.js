@@ -14,6 +14,84 @@ document.addEventListener('DOMContentLoaded', () => {
   let calendarMonth = 10;
   let todayState = null;
   let selectedTask = null; // for task details modal
+  let lastNotificationFiredTime = 0;
+
+  // ==========================================
+  // Notification Service (Capacitor & Web)
+  // ==========================================
+  const NotificationService = {
+    async requestPermission() {
+      try {
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+          const { LocalNotifications } = window.Capacitor.Plugins;
+          const status = await LocalNotifications.requestPermissions();
+          return status.display === 'granted';
+        }
+        if ('Notification' in window && Notification.permission !== 'granted') {
+          const perm = await Notification.requestPermission();
+          return perm === 'granted';
+        }
+      } catch (err) {
+        console.warn('Could not request notification permissions:', err);
+      }
+      return false;
+    },
+
+    async scheduleOrSendNotification(title, body) {
+      try {
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+          const { LocalNotifications } = window.Capacitor.Plugins;
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                id: Math.floor(Math.random() * 100000) + 1,
+                title: title || 'HONEST',
+                body: body || 'Be honest with yourself. You still have unfinished tasks today.',
+                schedule: { at: new Date(Date.now() + 500) },
+                sound: null
+              }
+            ]
+          });
+          return;
+        }
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title || 'HONEST', {
+            body: body || 'Be honest with yourself. You still have unfinished tasks today.',
+            icon: '/favicon.svg'
+          });
+        }
+      } catch (err) {
+        console.warn('Could not schedule local notification:', err);
+      }
+    }
+  };
+
+  // Helper: Normalize keyboard time inputs (e.g. 22:30, 10:30 PM, 10:30) to HH:MM 24h
+  function normalizeTimeInput(val) {
+    if (!val) return '';
+    val = val.trim().toLowerCase();
+    const match24 = val.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24) {
+      const h = parseInt(match24[1], 10);
+      const m = parseInt(match24[2], 10);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
+    const match12 = val.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/);
+    if (match12) {
+      let h = parseInt(match12[1], 10);
+      const m = match12[2] ? parseInt(match12[2], 10) : 0;
+      const mer = match12[3];
+      if (mer === 'pm' && h < 12) h += 12;
+      if (mer === 'am' && h === 12) h = 0;
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
+    return val;
+  }
 
   // ==========================================
   // DOM Elements
@@ -31,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const notificationClose = document.getElementById('notification-close');
 
   // Today View Elements
+  const todayHeaderBlock = document.querySelector('.today-header-block');
   const todayDateDisplay = document.getElementById('today-date-display');
   const todayCompletionCount = document.getElementById('today-completion-count');
   const honestDaysNumber = document.getElementById('honest-days-number');
@@ -59,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const formAddTask = document.getElementById('form-add-task');
   const taskRepeatRadios = document.querySelectorAll('input[name="task-repeat"]');
   const taskSelectedDaysWrap = document.getElementById('task-selected-days-wrap');
+  const taskInputReminder = document.getElementById('task-input-reminder');
 
   // Task Details Modal
   const modalTaskDetail = document.getElementById('modal-task-detail');
@@ -143,8 +223,17 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initNavigation();
   initModals();
-  initFormListeners();
   loadTodayData();
+
+  // Request notifications permission on start
+  NotificationService.requestPermission();
+
+  // Periodic accountability check (every 30 seconds)
+  setInterval(() => {
+    if (todayState && currentView === 'view-today') {
+      evaluateNightCheck(todayState);
+    }
+  }, 30000);
 
   // ==========================================
   // Theme Management
@@ -164,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // Error Banner
+  // Error Banner Management
   // ==========================================
   function showError(msg) {
     errorText.textContent = msg;
@@ -237,7 +326,8 @@ document.addEventListener('DOMContentLoaded', () => {
     tasksEmpty.classList.add('hidden');
 
     try {
-      todayState = await ApiService.getTodayState();
+      const res = await ApiService.getTodayState();
+      todayState = res.data || res;
       renderTodayHeader(todayState);
 
       // Handle Midnight / Day Lock: if previous day is unresolved, lock dashboard
@@ -268,52 +358,52 @@ document.addEventListener('DOMContentLoaded', () => {
     taskList.innerHTML = '';
     const total = tasks.length;
     const completed = tasks.filter(t => t.completed).length;
-    todayCompletionCount.textContent = `${completed} / ${total} completed`;
 
     if (total === 0) {
       tasksEmpty.classList.remove('hidden');
       return;
     }
+
     tasksEmpty.classList.add('hidden');
 
     tasks.forEach(task => {
       const li = document.createElement('li');
-      li.className = `task-item ${task.completed ? 'completed' : ''}`;
+      li.className = `task-card ${task.completed ? 'completed' : ''}`;
       li.setAttribute('data-id', task.id);
 
-      const repeatLabel = task.repeat === 'daily' ? 'Every day' : task.repeat === 'selected' ? 'Specific days' : 'One time';
-      const descHtml = task.definition ? `<div class="task-desc">${escapeHtml(task.definition)}</div>` : '';
-      const reminderHtml = task.reminder ? `<span class="task-meta-tag">⏰ ${escapeHtml(task.reminder)}</span>` : '';
-
       li.innerHTML = `
-        <div class="task-clickable-body" title="Click to view details or edit">
-          <div class="task-title">${escapeHtml(task.title || task.name)}</div>
-          ${descHtml}
-          <div class="task-meta-line">
-            <span class="task-meta-tag">${repeatLabel}</span>
-            ${reminderHtml}
+        <div class="task-info-block">
+          <div class="task-main-row">
+            <span class="task-name">${escapeHtml(task.title || task.name)}</span>
+          </div>
+          ${task.definition ? `<div class="task-definition">${escapeHtml(task.definition)}</div>` : ''}
+          <div class="task-badges">
+            ${task.category ? `<span class="badge badge-category">${escapeHtml(task.category)}</span>` : ''}
+            ${task.repeat && task.repeat !== 'daily' && task.repeat !== 'everyday' ? `<span class="badge">${task.repeat === 'selected' ? 'Custom Days' : 'One-time'}</span>` : ''}
+            ${task.reminderTime || task.reminder ? `<span class="badge">⏰ ${task.reminderTime || task.reminder}</span>` : ''}
           </div>
         </div>
-        <div class="task-toggle-wrapper">
+
+        <div class="task-toggle-wrap">
           <span class="toggle-state-badge">${task.completed ? 'ON' : 'OFF'}</span>
-          <label class="task-switch" title="Toggle ON/OFF">
-            <input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Toggle completion">
-            <span class="task-slider"></span>
+          <label class="honest-switch" aria-label="Toggle completion for ${escapeHtml(task.title || task.name)}">
+            <input type="checkbox" class="task-checkbox-input" ${task.completed ? 'checked' : ''}>
+            <span class="honest-slider"></span>
           </label>
         </div>
       `;
 
-      // 1. Click task body -> Open Task Detail Modal
-      const clickableBody = li.querySelector('.task-clickable-body');
-      clickableBody.addEventListener('click', () => {
+      // Click card (outside switch) opens Task Details Modal
+      const infoBlock = li.querySelector('.task-info-block');
+      infoBlock.addEventListener('click', () => {
         openTaskDetailModal(task);
       });
 
-      // 2. Toggle ON / OFF Switch
-      const toggleInput = li.querySelector('.task-switch input');
+      // Toggle ON / OFF Switch
+      const checkbox = li.querySelector('.task-checkbox-input');
       const stateBadge = li.querySelector('.toggle-state-badge');
 
-      toggleInput.addEventListener('change', async (e) => {
+      checkbox.addEventListener('change', async (e) => {
         const isNowCompleted = e.target.checked;
         stateBadge.textContent = isNowCompleted ? 'ON' : 'OFF';
         li.classList.toggle('completed', isNowCompleted);
@@ -345,6 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function evaluateNightCheck(state) {
+    if (!state) return;
     const tasks = state.tasks || [];
     const incomplete = tasks.filter(t => !t.completed);
 
@@ -352,6 +443,16 @@ document.addEventListener('DOMContentLoaded', () => {
       nightCheckPromptBanner.classList.remove('hidden');
       nightCheckPromptText.textContent = `You still have ${incomplete.length} unfinished ${incomplete.length === 1 ? 'task' : 'tasks'} today.`;
       globalNotification.classList.remove('hidden');
+
+      // Dispatch local mobile reminder notification (throttled to once per 10 mins)
+      const nowMs = Date.now();
+      if (nowMs - lastNotificationFiredTime > 10 * 60 * 1000) {
+        lastNotificationFiredTime = nowMs;
+        NotificationService.scheduleOrSendNotification(
+          'HONEST',
+          'Be honest with yourself. You still have unfinished tasks today.'
+        );
+      }
     } else {
       nightCheckPromptBanner.classList.add('hidden');
       globalNotification.classList.add('hidden');
@@ -364,6 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function showDayLockScreen(state) {
     dayLockContainer.classList.remove('hidden');
     tasksContainerWrap.classList.add('hidden');
+    if (todayHeaderBlock) todayHeaderBlock.classList.add('hidden');
 
     lockUnfinishedList.innerHTML = '';
     const unfinished = state.unresolvedYesterdayTasks || [];
@@ -384,12 +486,22 @@ document.addEventListener('DOMContentLoaded', () => {
     formDayLock.classList.remove('hidden');
     lockSuccessView.classList.add('hidden');
     lockReasonInput.value = '';
+    setTimeout(() => lockReasonInput.focus(), 150);
   }
 
   function hideDayLockScreen() {
     dayLockContainer.classList.add('hidden');
     tasksContainerWrap.classList.remove('hidden');
+    if (todayHeaderBlock) todayHeaderBlock.classList.remove('hidden');
   }
+
+  // Pressing Enter directly saves the reflection
+  lockReasonInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      formDayLock.requestSubmit();
+    }
+  });
 
   formDayLock.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -417,8 +529,8 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedTask = task;
     taskDetailTitle.textContent = task.title || task.name;
     detailPropDescription.textContent = task.definition || 'None';
-    detailPropRepeat.textContent = task.repeat === 'daily' ? 'Every day' : task.repeat === 'selected' ? 'Specific days' : 'One time';
-    detailPropReminder.textContent = task.reminder || 'None';
+    detailPropRepeat.textContent = (task.repeat === 'daily' || task.repeat === 'everyday') ? 'Every day' : task.repeat === 'selected' ? 'Specific days' : 'One time';
+    detailPropReminder.textContent = task.reminderTime || task.reminder || 'None';
     detailPropCreated.textContent = task.startDate || task.createdDate || task.date || 'Today';
 
     openModal(modalTaskDetail);
@@ -447,11 +559,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Prefill Edit Modal
     editTaskId.value = selectedTask.id;
     editTaskTitle.value = selectedTask.title || selectedTask.name;
-    editTaskDescription.value = selectedTask.definition || '';
-    editTaskReminder.value = selectedTask.reminder || '';
+    editTaskDescription.value = selectedTask.definition || selectedTask.description || '';
+    editTaskReminder.value = selectedTask.reminderTime || selectedTask.reminder || '';
 
-    const repeatVal = selectedTask.repeat || 'daily';
-    const matchingRadio = document.querySelector(`input[name="edit-task-repeat"][value="${repeatVal}"]`);
+    const repeatVal = selectedTask.repeat || 'everyday';
+    const matchingRadio = document.querySelector(`input[name="edit-task-repeat"][value="${repeatVal === 'everyday' ? 'daily' : repeatVal}"]`);
     if (matchingRadio) matchingRadio.checked = true;
 
     editSelectedDaysWrap.classList.toggle('hidden', repeatVal !== 'selected');
@@ -478,21 +590,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = editTaskId.value;
     const title = editTaskTitle.value.trim();
     const description = editTaskDescription.value.trim();
-    const reminder = editTaskReminder.value || null;
+    const reminder = normalizeTimeInput(editTaskReminder.value) || null;
     const repeatRadio = document.querySelector('input[name="edit-task-repeat"]:checked');
     const repeat = repeatRadio ? repeatRadio.value : 'daily';
 
     let selectedDays = [];
     if (repeat === 'selected') {
-      const checkedBoxes = document.querySelectorAll('input[name="edit-selected-day"]:checked');
-      selectedDays = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
+      const checked = document.querySelectorAll('input[name="edit-selected-day"]:checked');
+      selectedDays = Array.from(checked).map(cb => parseInt(cb.value, 10));
     }
 
     const payload = {
       title,
-      definition: description || null,
+      name: title,
+      definition: description || 'Complete as intended',
+      description,
       repeat,
       selectedDays,
+      reminderTime: reminder,
       reminder
     };
 
@@ -523,9 +638,9 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const title = document.getElementById('task-input-title').value.trim();
     const description = document.getElementById('task-input-description').value.trim();
-    const reminder = document.getElementById('task-input-reminder').value || null;
+    const reminder = normalizeTimeInput(taskInputReminder.value) || null;
     const repeatRadio = document.querySelector('input[name="task-repeat"]:checked');
-    const repeat = repeatRadio ? repeatRadio.value : 'daily';
+    const repeat = repeatRadio ? repeatRadio.value : 'everyday';
 
     let selectedDays = [];
     if (repeat === 'selected') {
@@ -535,11 +650,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const payload = {
       title,
+      name: title,
       definition: description || 'Complete as intended',
+      description,
       repeat,
       selectedDays,
+      reminderTime: reminder,
       reminder,
-      category: 'General',
+      category: 'Focus',
       accountabilityTime: '22:30'
     };
 
@@ -563,8 +681,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function openNightCheckModal() {
     try {
-      const data = await ApiService.getNightCheckState();
-      const unfinished = data.unfinishedTasks || data.data?.unfinishedTasks || [];
+      const res = await ApiService.getNightCheckState();
+      const data = res.data || res;
+      const unfinished = data.unfinishedTasks || [];
 
       nightCheckTasksList.innerHTML = '';
       if (unfinished.length === 0) {
@@ -614,8 +733,9 @@ document.addEventListener('DOMContentLoaded', () => {
     calendarDayDetail.classList.add('hidden');
 
     try {
-      const data = await ApiService.getCalendarMonth(month, year);
-      const historyMap = data.history || data.data?.history || {};
+      const res = await ApiService.getCalendarMonth(month, year);
+      const data = res.data || res;
+      const historyMap = data.history || {};
       renderCalendarGrid(month, year, historyMap);
     } catch (err) {
       showError('Failed to load calendar: ' + err.message);
@@ -648,6 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const cell = document.createElement('div');
       cell.className = 'calendar-day-cell';
+
       if (isCurrentMonthYear && today.getDate() === day) {
         cell.classList.add('is-today');
       }
@@ -660,6 +781,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dayData.status === 'completed') dot.classList.add('dot-completed');
         else if (dayData.status === 'explained') dot.classList.add('dot-explained');
         else if (dayData.status === 'unresolved') dot.classList.add('dot-unresolved');
+        else if (dayData.status === 'active') dot.classList.add('dot-active');
         cell.appendChild(dot);
       }
 
@@ -673,23 +795,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function showDayDetails(dateString) {
     try {
-      const details = await ApiService.getCalendarDay(dateString);
+      const res = await ApiService.getCalendarDay(dateString);
+      const details = res.data || res;
       calendarDayDetail.classList.remove('hidden');
 
       const dateObj = new Date(dateString);
       dayDetailDate.textContent = `${dateObj.getDate()} ${getMonthName(dateObj.getMonth() + 1)}`;
-      dayDetailRatio.textContent = `${details.completed || 0} / ${details.total || 0} completed`;
+
+      const tasks = details.tasks || details.items || [];
+      const completedCount = details.completed ?? tasks.filter(t => t.completed).length;
+      const totalCount = details.total ?? tasks.length;
+      dayDetailRatio.textContent = `${completedCount} / ${totalCount} completed`;
 
       dayDetailTasks.innerHTML = '';
-      (details.tasks || details.items || []).forEach(t => {
+      if (tasks.length === 0) {
         const row = document.createElement('li');
         row.className = 'history-task-row';
-        row.innerHTML = `
-          <span>${escapeHtml(t.title || t.name)}</span>
-          <span class="${t.completed ? 'text-accent' : 'text-danger'}">${t.completed ? '✅ Completed' : '❌ Missed'}</span>
-        `;
+        row.style.opacity = '0.5';
+        row.innerHTML = '<span>No tasks recorded for this date.</span>';
         dayDetailTasks.appendChild(row);
-      });
+      } else {
+        tasks.forEach(t => {
+          const row = document.createElement('li');
+          row.className = 'history-task-row';
+          row.innerHTML = `
+            <span>${escapeHtml(t.title || t.name)}</span>
+            <span class="${t.completed ? 'text-accent' : 'text-danger'}">${t.completed ? '✅ Completed' : '❌ Missed'}</span>
+          `;
+          dayDetailTasks.appendChild(row);
+        });
+      }
 
       if (details.reflection) {
         dayDetailReflectionBox.classList.remove('hidden');
@@ -729,49 +864,55 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   // VIEW 3: PAST REFLECTIONS (HISTORY)
   // ==========================================
+  let archiveDebounceTimer = null;
+  archiveSearchInput.addEventListener('input', () => {
+    clearTimeout(archiveDebounceTimer);
+    archiveDebounceTimer = setTimeout(() => {
+      loadArchive(archiveSearchInput.value.trim());
+    }, 250);
+  });
+
   async function loadArchive(query = '') {
     archiveLoading.classList.remove('hidden');
     archiveEmpty.classList.add('hidden');
     archiveList.innerHTML = '';
 
     try {
-      const data = await ApiService.getArchive(query);
-      const reflections = data.reflections || data.items || [];
+      const res = await ApiService.getArchive(query);
+      const data = res.data || res;
+      const reflections = data.reflections || data.archive || [];
 
       if (reflections.length === 0) {
         archiveEmpty.classList.remove('hidden');
         return;
       }
 
-      reflections.forEach(item => {
-        const card = document.createElement('div');
-        card.className = 'archive-card';
-        card.innerHTML = `
-          <div class="archive-meta">
-            <span class="archive-date">${escapeHtml(item.date)}</span>
-            <span class="archive-task-name">${escapeHtml(item.taskName || 'Missed Commitment')}</span>
+      reflections.forEach(ref => {
+        const item = document.createElement('div');
+        item.className = 'archive-item';
+        item.innerHTML = `
+          <div class="archive-item-header">
+            <span class="archive-date">${escapeHtml(ref.date || ref.dateLabel || 'Past Date')}</span>
+            <span class="archive-task">Missed: ${escapeHtml(ref.taskName || 'Incomplete Promise')}</span>
           </div>
-          <div class="archive-reason">"${escapeHtml(item.reason)}"</div>
+          <div class="archive-reason">"${escapeHtml(ref.reason)}"</div>
         `;
-        archiveList.appendChild(card);
+        archiveList.appendChild(item);
       });
     } catch (err) {
-      showError('Failed to load reflections: ' + err.message);
+      showError('Failed to load archive: ' + err.message);
     } finally {
       archiveLoading.classList.add('hidden');
     }
   }
-
-  archiveSearchInput.addEventListener('input', (e) => {
-    loadArchive(e.target.value.trim());
-  });
 
   // ==========================================
   // VIEW 4: SETTINGS
   // ==========================================
   async function loadSettings() {
     try {
-      const s = await ApiService.getSettings();
+      const res = await ApiService.getSettings();
+      const s = res.data || res;
       if (s.accountabilityTime) settingAccountabilityTime.value = s.accountabilityTime;
       if (s.dailyReset) settingDailyReset.value = s.dailyReset;
       if (s.notifications !== undefined) settingNotifications.checked = s.notifications;
@@ -785,6 +926,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  settingNotifications.addEventListener('change', () => {
+    if (settingNotifications.checked) {
+      NotificationService.requestPermission();
+    }
+  });
+
   settingsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     settingsStatusMsg.textContent = 'Saving...';
@@ -794,9 +941,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const customApi = settingApiUrl ? settingApiUrl.value.trim() : '';
     ApiService.setBaseUrl(customApi);
 
+    const normAcc = normalizeTimeInput(settingAccountabilityTime.value) || '22:30';
+    const normReset = normalizeTimeInput(settingDailyReset.value) || '00:00';
+    settingAccountabilityTime.value = normAcc;
+    settingDailyReset.value = normReset;
+
     const payload = {
-      accountabilityTime: settingAccountabilityTime.value,
-      dailyReset: settingDailyReset.value,
+      accountabilityTime: normAcc,
+      dailyReset: normReset,
       notifications: settingNotifications.checked,
       theme: settingTheme.value,
       apiUrl: customApi
@@ -817,7 +969,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Modal Utilities
   // ==========================================
   function initModals() {
-    // Backdrop click closes modal
     document.querySelectorAll('.modal-backdrop').forEach(modal => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal(modal);
@@ -832,8 +983,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeModal(modalEl) {
     modalEl.classList.add('hidden');
   }
-
-  function initFormListeners() {}
 
   // ==========================================
   // General Helpers

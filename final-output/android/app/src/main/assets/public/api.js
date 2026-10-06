@@ -3,11 +3,11 @@
  * 
  * Works seamlessly in both:
  * 1. Online Mode: Connected to Express/Vercel backend REST APIs
- * 2. Mobile / Standalone Mode: 100% offline, persistent on-device SQLite/LocalStorage engine
+ * 2. Standalone Mobile Mode: 100% offline, persistent on-device SQLite/LocalStorage engine
  */
 
 const ApiService = (function () {
-  const STORAGE_KEY = 'honest_local_state_v2';
+  const STORAGE_KEY = 'honest_local_state_v3';
   let BASE_URL = (localStorage.getItem('honest_api_url') || '').trim();
   let isBackendConnected = false;
   let onConnectionChangeCallback = null;
@@ -28,6 +28,8 @@ const ApiService = (function () {
   let localState = {
     date: initialDates.date,
     isoDate: initialDates.isoDate,
+    lastActiveDate: initialDates.isoDate,
+    yesterdayDate: null,
     honestDays: 0,
     isOffDay: false,
     offDayReason: null,
@@ -35,32 +37,38 @@ const ApiService = (function () {
     hasUnresolvedYesterday: false,
     tasks: [
       { id: 't1', title: '2 hrs Coding', name: '2 hrs Coding', definition: 'At least 45 minutes focused session', category: 'Focus', repeat: 'everyday', completed: false, accountabilityTime: '22:30', createdAt: new Date().toISOString() },
-      { id: 't2', title: 'Study 1 Chapter', name: 'Study 1 Chapter', definition: 'Take handwritten notes, no skimming', category: 'Study', repeat: 'everyday', completed: true, accountabilityTime: '22:30', createdAt: new Date().toISOString() },
+      { id: 't2', title: 'Study 1 Chapter', name: 'Study 1 Chapter', definition: 'Take handwritten notes, no skimming', category: 'Study', repeat: 'everyday', completed: false, accountabilityTime: '22:30', createdAt: new Date().toISOString() },
       { id: 't3', title: '30 min Workout', name: '30 min Workout', definition: 'Full core & stretch routine', category: 'Health', repeat: 'everyday', completed: false, accountabilityTime: '22:30', createdAt: new Date().toISOString() },
-      { id: 't4', title: 'DSA 3 Problems', name: 'DSA 3 Problems', definition: 'Solve without looking at solutions', category: 'Focus', repeat: 'everyday', completed: true, accountabilityTime: '22:30', createdAt: new Date().toISOString() },
+      { id: 't4', title: 'DSA 3 Problems', name: 'DSA 3 Problems', definition: 'Solve without looking at solutions', category: 'Focus', repeat: 'everyday', completed: false, accountabilityTime: '22:30', createdAt: new Date().toISOString() },
       { id: 't5', title: 'Read 20 Pages', name: 'Read 20 Pages', definition: 'Deep reading, no phone in room', category: 'Reading', repeat: 'everyday', completed: false, accountabilityTime: '22:30', createdAt: new Date().toISOString() }
     ],
     unresolvedYesterdayTasks: [],
+    calendarHistory: {
+      '2026-10-01': { status: 'explained', completed: 3, total: 4, tasks: [{ title: 'Coding', completed: true }, { title: 'Study', completed: true }, { title: 'Reading', completed: true }, { title: 'Workout', completed: false }], reflection: 'Too tired after traveling back from lab.' },
+      '2026-10-02': { status: 'completed', completed: 5, total: 5, tasks: [{ title: 'Coding', completed: true }, { title: 'Study', completed: true }, { title: 'Workout', completed: true }, { title: 'DSA', completed: true }, { title: 'Reading', completed: true }], reflection: null },
+      '2026-10-03': { status: 'explained', completed: 4, total: 5, tasks: [{ title: 'Coding', completed: true }, { title: 'Study', completed: true }, { title: 'DSA', completed: true }, { title: 'Reading', completed: true }, { title: 'Workout', completed: false }], reflection: 'Had a college event and returned late.' },
+      '2026-10-04': { status: 'unresolved', completed: 2, total: 4, tasks: [{ title: 'Coding', completed: true }, { title: 'Reading', completed: true }, { title: 'DSA', completed: false }, { title: 'Workout', completed: false }], reflection: null }
+    },
     reflectionsArchive: [
-      { id: 'r1', date: 'October 3, 2026', taskName: 'Revision', reason: 'Had a college event and returned late.', timestamp: new Date(Date.now() - 86400000 * 2).toISOString() },
-      { id: 'r2', date: 'October 1, 2026', taskName: 'DSA Practice', reason: 'Too tired after traveling back from lab.', timestamp: new Date(Date.now() - 86400000 * 4).toISOString() }
+      { id: 'r1', date: 'October 3, 2026', taskName: 'Workout', reason: 'Had a college event and returned late.', timestamp: new Date(Date.now() - 86400000 * 2).toISOString() },
+      { id: 'r2', date: 'October 1, 2026', taskName: 'Workout', reason: 'Too tired after traveling back from lab.', timestamp: new Date(Date.now() - 86400000 * 4).toISOString() }
     ],
     weeklyReport: {
-      completedCount: 18,
-      totalCount: 24,
-      completionRate: 75.0,
+      completedCount: 14,
+      totalCount: 18,
+      completionRate: 77.8,
       mostConsistent: 'Coding (100%)',
       mostSkipped: 'Workout (50%)',
-      commonReason: 'Too tired after college',
+      commonReason: 'Got back late / exhausted',
       insight: 'You don\'t need more motivation. You may need an earlier schedule.'
     },
     scoreStats: {
-      honestyScore: 88,
+      honestyScore: 86,
       month: 'October 2026',
-      promisesMade: 24,
-      completed: 18,
-      missed: 6,
-      explained: 6,
+      promisesMade: 18,
+      completed: 14,
+      missed: 4,
+      explained: 4,
       unexplained: 0
     },
     patterns: [
@@ -79,6 +87,69 @@ const ApiService = (function () {
     }
   };
 
+  // Date Rollover & Day Lock Check
+  function checkDateRollover() {
+    const curDates = getTodayDateStrings();
+    const todayIso = curDates.isoDate;
+
+    if (!localState.lastActiveDate) {
+      localState.lastActiveDate = todayIso;
+      savePersistedState();
+      return;
+    }
+
+    if (localState.lastActiveDate !== todayIso) {
+      // Date has changed! Check if yesterday had incomplete tasks
+      const prevDate = localState.lastActiveDate;
+      const prevTasks = Array.isArray(localState.tasks) ? [...localState.tasks] : [];
+      const incomplete = prevTasks.filter(t => !t.completed);
+
+      localState.calendarHistory = localState.calendarHistory || {};
+
+      if (incomplete.length > 0) {
+        // Yesterday was NOT finished: activate Day Lock
+        localState.hasUnresolvedYesterday = true;
+        localState.unresolvedYesterdayTasks = incomplete;
+        localState.yesterdayDate = prevDate;
+
+        localState.calendarHistory[prevDate] = {
+          status: 'unresolved',
+          completed: prevTasks.filter(t => t.completed).length,
+          total: prevTasks.length,
+          tasks: prevTasks.map(t => ({ title: t.title || t.name, completed: !!t.completed })),
+          reflection: null
+        };
+      } else {
+        // All tasks were finished yesterday
+        localState.hasUnresolvedYesterday = false;
+        localState.unresolvedYesterdayTasks = [];
+        localState.yesterdayDate = null;
+        localState.honestDays = (localState.honestDays || 0) + 1;
+
+        localState.calendarHistory[prevDate] = {
+          status: 'completed',
+          completed: prevTasks.length,
+          total: prevTasks.length,
+          tasks: prevTasks.map(t => ({ title: t.title || t.name, completed: true })),
+          reflection: null
+        };
+      }
+
+      // Reset recurring tasks for the new active day
+      localState.tasks = prevTasks.map(t => {
+        if (t.repeat === 'everyday' || t.repeat === 'daily') {
+          return { ...t, completed: false };
+        }
+        return t;
+      }).filter(t => t.repeat !== 'once' || !t.completed);
+
+      localState.lastActiveDate = todayIso;
+      localState.date = curDates.date;
+      localState.isoDate = todayIso;
+      savePersistedState();
+    }
+  }
+
   // Load persisted state from device storage
   function loadPersistedState() {
     try {
@@ -89,11 +160,7 @@ const ApiService = (function () {
       }
     } catch (_) {}
 
-    // Synchronize to current calendar day
-    const curDates = getTodayDateStrings();
-    localState.date = curDates.date;
-    localState.isoDate = curDates.isoDate;
-    savePersistedState();
+    checkDateRollover();
   }
 
   function savePersistedState() {
@@ -102,7 +169,7 @@ const ApiService = (function () {
     } catch (_) {}
   }
 
-  // Initialize state immediately
+  // Initialize immediately
   loadPersistedState();
 
   function setConnected(status) {
@@ -148,7 +215,6 @@ const ApiService = (function () {
       // Verify that response is valid JSON
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
-        // Returned HTML (e.g. mobile asset fallback / 404 page)
         setConnected(false);
         return handleFallback(endpoint, options);
       }
@@ -166,8 +232,6 @@ const ApiService = (function () {
       return await response.json();
     } catch (err) {
       clearTimeout(timeoutId);
-
-      // Network errors, timeouts, or JSON syntax issues smoothly fall back to local mode
       setConnected(false);
       return handleFallback(endpoint, options);
     }
@@ -178,6 +242,17 @@ const ApiService = (function () {
    */
   async function handleFallback(endpoint, options) {
     const method = (options.method || 'GET').toUpperCase();
+    checkDateRollover();
+
+    // Current time evaluation for Daily Check Time
+    const now = new Date();
+    const curMins = now.getHours() * 60 + now.getMinutes();
+    const [accH, accM] = (localState.settings.accountabilityTime || '22:30').split(':').map(Number);
+    const accMins = (accH || 22) * 60 + (accM || 30);
+    const incompleteTasks = localState.tasks.filter(t => !t.completed);
+
+    // Night check is active if current time is past Daily Check Time and incomplete tasks exist
+    localState.nightCheckActive = (curMins >= accMins && incompleteTasks.length > 0);
 
     // GET /today
     if (endpoint === '/today' && method === 'GET') {
@@ -185,7 +260,8 @@ const ApiService = (function () {
       return {
         ...localState,
         completedCount: completed,
-        totalCount: localState.tasks.length
+        totalCount: localState.tasks.length,
+        nightCheckActive: localState.nightCheckActive
       };
     }
 
@@ -263,7 +339,7 @@ const ApiService = (function () {
     if (endpoint === '/night-check' && method === 'GET') {
       const unfinished = localState.tasks.filter(t => !t.completed);
       return {
-        active: unfinished.length > 0,
+        active: unfinished.length > 0 && curMins >= accMins,
         unfinishedTasks: unfinished,
         accountabilityTime: localState.settings.accountabilityTime
       };
@@ -272,18 +348,31 @@ const ApiService = (function () {
     // POST /night-check/reflect
     if (endpoint === '/night-check/reflect' && method === 'POST') {
       const payload = JSON.parse(options.body || '{}');
-      localState.reflectionsArchive.unshift({
+      const refDate = localState.yesterdayDate || localState.date;
+      const missedNames = (localState.unresolvedYesterdayTasks || []).map(t => t.title || t.name).join(', ') || 'Incomplete Promises';
+
+      const newRef = {
         id: 'ref-' + Date.now(),
-        date: localState.date,
-        taskName: payload.taskName || 'Incomplete Tasks',
+        date: refDate,
+        taskName: payload.taskName || missedNames,
         reason: payload.reason,
         timestamp: new Date().toISOString()
-      });
+      };
+      localState.reflectionsArchive.unshift(newRef);
+
+      // Update calendar entry for that date to explained
+      localState.calendarHistory = localState.calendarHistory || {};
+      if (localState.yesterdayDate && localState.calendarHistory[localState.yesterdayDate]) {
+        localState.calendarHistory[localState.yesterdayDate].status = 'explained';
+        localState.calendarHistory[localState.yesterdayDate].reflection = payload.reason;
+      }
+
       localState.hasUnresolvedYesterday = false;
       localState.unresolvedYesterdayTasks = [];
+      localState.yesterdayDate = null;
       localState.honestDays = (localState.honestDays || 0) + 1;
       savePersistedState();
-      return { success: true, message: 'Reflection recorded.' };
+      return { success: true, message: 'Reflection recorded.', reflection: newRef };
     }
 
     // POST /off-day
@@ -296,15 +385,17 @@ const ApiService = (function () {
     }
 
     // GET /calendar
-    if (endpoint.startsWith('/calendar') && method === 'GET') {
-      const completed = localState.tasks.filter(t => t.completed).length;
-      const historyMap = {
-        '2026-10-01': { status: 'explained', completed: 3, total: 4, reflection: 'Too tired after traveling back from lab.' },
-        '2026-10-02': { status: 'completed', completed: 5, total: 5 },
-        '2026-10-03': { status: 'explained', completed: 4, total: 5, reflection: 'Had a college event and returned late.' },
-        '2026-10-04': { status: 'unresolved', completed: 1, total: 4 },
-        '2026-10-05': { status: completed === localState.tasks.length ? 'completed' : 'active', completed, total: localState.tasks.length }
+    if (endpoint.startsWith('/calendar') && !endpoint.includes('/day/') && method === 'GET') {
+      const curCompleted = localState.tasks.filter(t => t.completed).length;
+      const historyMap = { ...(localState.calendarHistory || {}) };
+
+      // Set today's current status
+      historyMap[localState.isoDate] = {
+        status: (curCompleted === localState.tasks.length && localState.tasks.length > 0) ? 'completed' : 'active',
+        completed: curCompleted,
+        total: localState.tasks.length
       };
+
       return {
         month: 'October 2026',
         history: historyMap
@@ -314,18 +405,42 @@ const ApiService = (function () {
     // GET /calendar/day/:date
     if (endpoint.startsWith('/calendar/day/') && method === 'GET') {
       const dateStr = endpoint.split('/')[3];
+
+      // If clicked on today
+      if (dateStr === localState.isoDate) {
+        const curCompleted = localState.tasks.filter(t => t.completed).length;
+        return {
+          date: dateStr,
+          completed: curCompleted,
+          total: localState.tasks.length,
+          tasks: localState.tasks.map(t => ({
+            title: t.title || t.name,
+            name: t.title || t.name,
+            completed: !!t.completed
+          })),
+          reflection: null
+        };
+      }
+
+      // If clicked on a saved historical date
+      if (localState.calendarHistory && localState.calendarHistory[dateStr]) {
+        const entry = localState.calendarHistory[dateStr];
+        return {
+          date: dateStr,
+          completed: entry.completed || 0,
+          total: entry.total || (entry.tasks ? entry.tasks.length : 0),
+          tasks: entry.tasks || [],
+          reflection: entry.reflection || null
+        };
+      }
+
+      // Any other date
       return {
         date: dateStr,
-        completed: 4,
-        total: 5,
-        tasks: [
-          { title: '2 hrs Coding', completed: true },
-          { title: 'Study 1 Chapter', completed: true },
-          { title: '30 min Workout', completed: true },
-          { title: 'DSA 3 Problems', completed: true },
-          { title: 'Read 20 Pages', completed: false }
-        ],
-        reflection: 'Had a college event and returned late.'
+        completed: 0,
+        total: 0,
+        tasks: [],
+        reflection: null
       };
     }
 

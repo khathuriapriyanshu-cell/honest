@@ -167,7 +167,7 @@
 
               <form id="form-day-lock" class="lock-form">
                 <div class="form-group">
-                  <label for="lock-reason-input" class="form-label">Explain why</label>
+                  <label for="lock-reason-input" class="form-label" style="font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">TELL THIS TO YOURSELF</label>
                   <textarea id="lock-reason-input" class="form-textarea" rows="3" placeholder="Tell this to yourself." required></textarea>
                 </div>
                 <button type="submit" class="btn-primary full-width">Save Reflection &amp; Continue</button>
@@ -325,17 +325,17 @@
             <div class="setting-row">
               <div class="setting-info">
                 <label for="setting-accountability-time" class="setting-title">Daily Check Time</label>
-                <div class="setting-subtext">Evening check time. Default is 10:30 PM.</div>
+                <div class="setting-subtext">Evening check time (e.g. 22:30 or 10:30 PM). Tap to type.</div>
               </div>
-              <input type="time" id="setting-accountability-time" class="form-input input-time" value="22:30">
+              <input type="text" inputmode="numeric" id="setting-accountability-time" class="form-input input-time" value="22:30" placeholder="22:30" maxlength="8">
             </div>
 
             <div class="setting-row">
               <div class="setting-info">
                 <label for="setting-daily-reset" class="setting-title">Day Reset Time</label>
-                <div class="setting-subtext">When the day closes. Default is 12:00 AM.</div>
+                <div class="setting-subtext">When the day closes (e.g. 00:00 or 12:00 AM). Tap to type.</div>
               </div>
-              <input type="time" id="setting-daily-reset" class="form-input input-time" value="00:00">
+              <input type="text" inputmode="numeric" id="setting-daily-reset" class="form-input input-time" value="00:00" placeholder="00:00" maxlength="8">
             </div>
           </div>
 
@@ -452,7 +452,7 @@
 
         <div class="form-group">
           <label for="task-input-reminder" class="form-label">Reminder time (Optional)</label>
-          <input type="time" id="task-input-reminder" class="form-input input-time">
+          <input type="text" inputmode="numeric" id="task-input-reminder" class="form-input input-time" placeholder="e.g. 21:00 or 9:00 PM">
         </div>
 
         <div class="modal-footer">
@@ -566,7 +566,7 @@
 
         <div class="form-group">
           <label for="edit-task-reminder" class="form-label">Reminder time (Optional)</label>
-          <input type="time" id="edit-task-reminder" class="form-input input-time">
+          <input type="text" inputmode="numeric" id="edit-task-reminder" class="form-input input-time" placeholder="e.g. 21:00 or 9:00 PM">
         </div>
 
         <div class="modal-footer">

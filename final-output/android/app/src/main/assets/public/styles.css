@@ -241,25 +241,47 @@ h1, h2, h3, h4 {
   margin-top: 2px;
 }
 
-/* Nav Tabs */
+/* Bottom Navigation Bar (Dock) */
 .main-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: none;
+  height: calc(58px + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  height: 100%;
+  justify-content: space-around;
+  z-index: 100;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
 }
 
 .nav-tab {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0 0.95rem;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
   height: 100%;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.725rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-secondary);
-  border-bottom: 2px solid transparent;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  border-bottom: none;
+  border-top: 2px solid transparent;
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.nav-tab:active {
+  transform: scale(0.94);
 }
 
 .nav-tab:hover {
@@ -267,19 +289,19 @@ h1, h2, h3, h4 {
 }
 
 .nav-tab.active {
+  border-top-color: var(--accent-honest);
   color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
 }
 
 .nav-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   stroke-width: 2;
-  transition: transform var(--transition-fast);
+  transition: transform var(--transition-fast), color var(--transition-fast);
 }
 
-.nav-tab:hover .nav-icon {
-  transform: translateY(-1px);
+.nav-tab.active .nav-icon {
+  color: var(--accent-honest);
 }
 
 .header-controls {
@@ -324,7 +346,7 @@ h1, h2, h3, h4 {
   max-width: 820px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 1.75rem 1.25rem calc(5.5rem + var(--safe-bottom)) 1.25rem;
 }
 
 .view-panel {

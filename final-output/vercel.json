@@ -11,12 +11,6 @@
       "destination": "/public/$1"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/cron/tick",
-      "schedule": "*/10 * * * *"
-    }
-  ],
   "functions": {
     "api/index.js": {
       "maxDuration": 30,

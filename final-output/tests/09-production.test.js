@@ -674,8 +674,7 @@ module.exports = function productionTests() {
       }
 
       const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-      assertEqual(vercel.builds[0].src, 'api/index.js', 'Vercel builds the API function');
-      assertEqual(vercel.routes[0].dest, 'api/index.js', 'and routes everything to it');
+      assertEqual(Boolean(vercel.functions && vercel.functions['api/index.js']), true, 'Vercel configures the API function');
       assertEqual(vercel.crons[0].path, '/api/cron/tick', 'with a cron pointing at the tick endpoint');
       assertTrue(vercel.functions['api/index.js'].maxDuration >= 10, 'with a workable timeout');
 

@@ -5,7 +5,7 @@
   "description": "HONEST - backend API for a student accountability / promise-keeping application. Plan -> Promise -> Do -> Admit -> Reflect -> Start Again.",
   "main": "server.js",
   "engines": {
-    "node": ">=22.5.0"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node server.js",

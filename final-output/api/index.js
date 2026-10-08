@@ -24,48 +24,21 @@
  *     with `CRON_SECRET`.
  */
 
-let bootstrap = null;
-let initError = null;
+const { createBootstrap } = require('../bootstrap');
 
-try {
-  const { createBootstrap } = require('../bootstrap');
-  bootstrap = createBootstrap({ verbose: process.env.HONEST_QUIET !== '1' });
-} catch (err) {
-  initError = err;
-  console.error('[honest-vercel] Bootstrap initialization error:', err);
-}
+// One bootstrap per function instance. Warm invocations reuse the open
+// database connection; cold starts skip it until a request actually arrives.
+const bootstrap = createBootstrap({ verbose: process.env.HONEST_QUIET !== '1' });
 
-/** The Express app is the request handler, wrapped defensively */
-const handler = (req, res) => {
-  if (initError) {
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify({
-      error: 'Initialization failed',
-      message: initError.message,
-      stack: initError.stack
-    }));
-  }
-
-  try {
-    return bootstrap.app(req, res);
-  } catch (err) {
-    console.error('[honest-vercel] Request error:', err);
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify({
-      error: 'Request failed',
-      message: err.message
-    }));
-  }
-};
+/** The Express app is the request handler. */
+const handler = bootstrap.app;
 
 module.exports = handler;
 module.exports.default = handler;
 module.exports.handler = handler;
 module.exports.app = handler;
 
+// Useful for diagnostics from a deployment shell or an integration test.
 module.exports.bootstrap = bootstrap;
 module.exports.createApp = require('../app').createApp;
 module.exports.API_INDEX = require('../app').API_INDEX;
-
